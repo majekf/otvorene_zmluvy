@@ -1,0 +1,43 @@
+version: "3.9"
+
+services:
+  govlens:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - GOVLENS_HOST=0.0.0.0
+      - GOVLENS_PORT=8000
+      - GOVLENS_DATA_PATH=data/sample_contracts.json
+      - LLM_PROVIDER=mock
+      # Uncomment and set for real LLM:
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # - LLM_PROVIDER=openai
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/chat/status')"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # Optional: frontend dev server (for development only)
+  frontend-dev:
+    image: node:22-slim
+    working_dir: /app/frontend
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app/frontend
+      - /app/frontend/node_modules
+    environment:
+      - VITE_API_URL=http://govlens:8000
+    depends_on:
+      - govlens
+    profiles:
+      - dev
