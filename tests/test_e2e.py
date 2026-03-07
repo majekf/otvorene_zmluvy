@@ -120,15 +120,13 @@ class TestFullWorkflow:
         # Get institution list
         resp = client.get("/api/institutions")
         institutions = resp.json()["institutions"]
-        # Filter out names containing commas (comma-separated param conflict)
-        safe_institutions = [i for i in institutions if "," not in i["name"]]
-        if len(safe_institutions) < 2:
-            pytest.skip("Need at least 2 comma-free institutions for benchmark test")
+        if len(institutions) < 2:
+            pytest.skip("Need at least 2 institutions for benchmark test")
 
-        names = [safe_institutions[0]["name"], safe_institutions[1]["name"]]
+        names = [institutions[0]["name"], institutions[1]["name"]]
 
-        # Compare (comma-separated institutions)
-        institutions_param = ",".join(names)
+        # API uses pipe-separated institution names
+        institutions_param = "|".join(names)
         resp_bm = client.get(
             f"/api/benchmark?institutions={institutions_param}&metric=total_spend"
         )

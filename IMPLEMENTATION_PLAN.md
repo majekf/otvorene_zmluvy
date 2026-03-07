@@ -679,6 +679,24 @@ Phase 8: Polish & Deployment ← depends on ALL prior phases
 
 **Total estimated effort: 24–35 working days | Completed: ~24–35 days (All phases complete)**
 
+---
+
+## 4 — CHANGELOG
+
+### 2026-03-07 — Test fix: benchmark separator mismatch
+
+**File changed:** `tests/test_e2e.py` — `TestFullWorkflow::test_benchmark_comparison`
+
+**Problem:** The test was building the `institutions` query parameter with a comma separator (`",".join(names)`), but the `/api/benchmark` endpoint splits on `|` (`institutions.split("|")`). This caused the two institution names to be treated as a single (non-existent) institution, returning 1 result instead of 2.
+
+Additionally, the test was pre-filtering institution names that contained commas (`[i for i in institutions if "," not in i["name"]]`), which was a workaround layered on top of the wrong separator and is no longer needed.
+
+**Fix applied:**
+- Changed `",".join(names)` → `"|".join(names)` to match the pipe-delimited API contract.
+- Removed the `safe_institutions` comma-filter workaround and its misleading comment.
+- Simplified the skip guard to check `len(institutions) < 2` (no longer tied to comma presence).
+- Updated inline comment from `# Compare (comma-separated institutions)` to `# API uses pipe-separated institution names`.
+
 ### 3.3 Risks and Potential Blockers
 
 | Risk | Impact | Mitigation |
