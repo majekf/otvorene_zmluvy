@@ -10,7 +10,7 @@ describe('defaultUrlState', () => {
     expect(s.page).toBe(1);
     expect(s.pageSize).toBe(20);
     expect(s.sort).toEqual([]);
-    expect(s.groupBy).toBe('category');
+    expect(s.groupBy).toBe('supplier');
     expect(s.filters).toEqual({});
     expect(s.mode).toBe('dashboard');
   });
@@ -140,7 +140,7 @@ describe('Full state encode/decode (Phase 7)', () => {
     const decoded = parseUrlState('');
     expect(decoded.filters).toEqual({});
     expect(decoded.sort).toEqual([]);
-    expect(decoded.groupBy).toBe('category');
+    expect(decoded.groupBy).toBe('supplier');
     expect(decoded.page).toBe(1);
     expect(decoded.pageSize).toBe(20);
     expect(decoded.mode).toBe('dashboard');
