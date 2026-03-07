@@ -18,34 +18,60 @@ const mockContracts = {
     {
       contract_id: 'ac1',
       contract_title: 'Group Contract A',
+      contract_number: null,
       buyer: 'Ministry of Interior',
       supplier: 'SupplierA',
       price_numeric_eur: 100000,
+      price_raw: null,
       published_date: '2024-04-01',
       category: 'construction',
       award_type: 'open_tender',
       pdf_text_summary: 'not_summarized',
+      contract_url: null,
+      ico_buyer: null,
+      ico_supplier: null,
+      date_published: null,
+      date_concluded: null,
+      date_effective: null,
+      date_valid_until: null,
+      pdf_url: null,
+      pdf_text: null,
+      scraped_at: null,
     },
     {
       contract_id: 'ac2',
       contract_title: 'Group Contract B',
+      contract_number: null,
       buyer: 'Ministry of Interior',
       supplier: 'SupplierB',
       price_numeric_eur: 50000,
+      price_raw: null,
       published_date: '2024-05-10',
       category: 'construction',
       award_type: 'direct_award',
       pdf_text_summary: 'not_summarized',
+      contract_url: null,
+      ico_buyer: null,
+      ico_supplier: null,
+      date_published: null,
+      date_concluded: null,
+      date_effective: null,
+      date_valid_until: null,
+      pdf_url: null,
+      pdf_text: null,
+      scraped_at: null,
     },
   ],
   total: 2,
   page: 1,
   page_size: 10,
+  total_pages: 1,
 };
 
 const paginatedContracts = {
   ...mockContracts,
   total: 25,
+  total_pages: 3,
 };
 
 const emptyContracts = {
@@ -53,6 +79,7 @@ const emptyContracts = {
   total: 0,
   page: 1,
   page_size: 10,
+  total_pages: 0,
 };
 
 function renderComponent(
