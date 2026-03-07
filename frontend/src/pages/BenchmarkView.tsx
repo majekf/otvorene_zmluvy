@@ -39,7 +39,7 @@ export default function BenchmarkView() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Parse initial state from URL
-  const urlInstitutions = searchParams.get('institutions')?.split(',').filter(Boolean) ?? [];
+  const urlInstitutions = searchParams.get('institutions')?.split('|').filter(Boolean) ?? [];
   const urlMinContracts = Number(searchParams.get('min_contracts')) || 1;
 
   const [allInstitutions, setAllInstitutions] = useState<InstitutionSummary[]>([]);
@@ -59,7 +59,7 @@ export default function BenchmarkView() {
   // Sync state → URL
   useEffect(() => {
     const params = new URLSearchParams();
-    if (selected.length) params.set('institutions', selected.join(','));
+    if (selected.length) params.set('institutions', selected.join('|'));
     if (minContracts > 1) params.set('min_contracts', String(minContracts));
     setSearchParams(params, { replace: true });
   }, [selected, minContracts, setSearchParams]);

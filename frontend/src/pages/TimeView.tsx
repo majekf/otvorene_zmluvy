@@ -68,10 +68,10 @@ export default function TimeView() {
     }
     if (showOverlays) params.set('overlay', 'true');
     // Merge filters into URL
-    if (filters.institutions?.length) params.set('institutions', filters.institutions.join(','));
+    if (filters.institutions?.length) params.set('institutions', filters.institutions.join('|'));
     if (filters.date_from) params.set('date_from', filters.date_from);
     if (filters.date_to) params.set('date_to', filters.date_to);
-    if (filters.categories?.length) params.set('categories', filters.categories.join(','));
+    if (filters.categories?.length) params.set('categories', filters.categories.join('|'));
     setSearchParams(params, { replace: true });
   }, [granularity, selectedMetrics, showOverlays, filters, setSearchParams]);
 

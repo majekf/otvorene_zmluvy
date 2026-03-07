@@ -48,7 +48,7 @@ describe('parseUrlState', () => {
   });
 
   it('parses filter fields', () => {
-    const s = parseUrlState('institutions=A,B&date_from=2024-01-01&value_min=100&text_search=test');
+    const s = parseUrlState('institutions=A%7CB&date_from=2024-01-01&value_min=100&text_search=test');
     expect(s.filters.institutions).toEqual(['A', 'B']);
     expect(s.filters.date_from).toBe('2024-01-01');
     expect(s.filters.value_min).toBe(100);
@@ -56,7 +56,7 @@ describe('parseUrlState', () => {
   });
 
   it('parses categories, vendors, award_types', () => {
-    const s = parseUrlState('categories=cat1,cat2&vendors=v1&award_types=direct_award');
+    const s = parseUrlState('categories=cat1%7Ccat2&vendors=v1&award_types=direct_award');
     expect(s.filters.categories).toEqual(['cat1', 'cat2']);
     expect(s.filters.vendors).toEqual(['v1']);
     expect(s.filters.award_types).toEqual(['direct_award']);
@@ -151,6 +151,22 @@ describe('Full state encode/decode (Phase 7)', () => {
     const encoded = encodeUrlState(original);
     const decoded = parseUrlState(encoded);
     expect(decoded.mode).toBe('time');
+  });
+
+  it('values containing commas survive round-trip', () => {
+    const original = {
+      ...defaultUrlState(),
+      filters: {
+        categories: ['IT, consulting', 'legal'],
+        vendors: ['Smith, Jones & Co'],
+        institutions: ['Ministry of Finance, SR'],
+      },
+    };
+    const encoded = encodeUrlState(original);
+    const decoded = parseUrlState(encoded);
+    expect(decoded.filters.categories).toEqual(['IT, consulting', 'legal']);
+    expect(decoded.filters.vendors).toEqual(['Smith, Jones & Co']);
+    expect(decoded.filters.institutions).toEqual(['Ministry of Finance, SR']);
   });
 
   it('contracts mode survives round-trip', () => {
