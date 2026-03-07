@@ -831,21 +831,29 @@ def scrape_contracts(
                                 contract_data.update(details)
 
                                 pdf_urls = details.get("pdf_urls", [])
-                                for pdf_url in pdf_urls:
+                                if pdf_urls:
+                                    # Keep all attachment links in `pdf_urls`, but only
+                                    # download/extract the primary attachment used downstream.
+                                    primary_pdf_url = pdf_urls[0]
                                     pdf_result = download_and_extract_pdf(
-                                        pdf_url,
+                                        primary_pdf_url,
                                         pdf_dir,
                                         session,
                                         agreement_context=agreement_context,
                                         throttler=throttler,
                                     )
 
-                                    if (
-                                        pdf_result["pdf_local_path"]
-                                        and not contract_data.get("pdf_local_path")
-                                    ):
+                                    if pdf_result["pdf_local_path"]:
                                         contract_data.update(pdf_result)
                                         pdfs_downloaded += 1
+
+                                    skipped_attachments = max(0, len(pdf_urls) - 1)
+                                    if skipped_attachments:
+                                        logger.info(
+                                            "Skipping %d additional PDF attachments for %s; links retained in pdf_urls",
+                                            skipped_attachments,
+                                            agreement_context,
+                                        )
 
                         if not first_record:
                             out_f.write(",\n")

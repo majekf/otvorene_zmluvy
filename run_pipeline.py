@@ -82,6 +82,12 @@ def main() -> int:
     parser.add_argument("--model", type=str, default="gpt-4o-mini")
     parser.add_argument("--api-key", type=str, default=None)
     parser.add_argument(
+        "--max-concurrency",
+        type=int,
+        default=5,
+        help="Maximum number of concurrent OpenAI extraction requests",
+    )
+    parser.add_argument(
         "--no-skip-processed",
         action="store_true",
         help="Re-analyze already scanned contracts",
@@ -169,6 +175,8 @@ def main() -> int:
         args.pdf_dir,
         "--model",
         args.model,
+        "--max-concurrency",
+        str(args.max_concurrency),
     ]
     if args.api_key:
         extract_cmd.extend(["--api-key", args.api_key])
