@@ -31,6 +31,10 @@ class Settings:
         self.llm_provider: str = os.getenv("LLM_PROVIDER", "mock")
         self.anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
         self.openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+        self.openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4.1-nano")
+        self.openai_temperature: float = float(
+            os.getenv("OPENAI_TEMPERATURE", "0.2")
+        )
 
         # Chatbot
         self.chat_streaming: bool = os.getenv("CHAT_STREAMING", "false").lower() == "true"
