@@ -42,6 +42,13 @@ Examples:
         default=1,
         help="Maximum number of pages to scrape (default: 1)"
     )
+
+    parser.add_argument(
+        "--max-contracts",
+        type=int,
+        default=None,
+        help="Maximum number of contracts/files to scrape across all pages (optional)"
+    )
     
     parser.add_argument(
         "--out",
@@ -133,6 +140,7 @@ Examples:
     logger.info(f"Starting CRZ scraper")
     logger.info(f"  Start page: {args.start_page}")
     logger.info(f"  Max pages: {args.max_pages}")
+    logger.info(f"  Max contracts: {args.max_contracts}")
     logger.info(f"  Output: {args.out}")
     logger.info(f"  Delay: {args.delay}s")
     logger.info(f"  Min price: {args.min_price}")
@@ -161,6 +169,7 @@ Examples:
         contracts_count = scrape_contracts(
             start_page=args.start_page,
             max_pages=args.max_pages,
+            max_contracts=args.max_contracts,
             output_file=args.out,
             delay=args.delay,
             min_price=args.min_price,

@@ -649,6 +649,7 @@ def enrich_json_with_ocr_text(
 def scrape_contracts(
     start_page: int = 1,
     max_pages: int = 1,
+    max_contracts: Optional[int] = None,
     output_file: str = "out.json",
     delay: float = DEFAULT_DELAY,
     min_price: Optional[float] = None,
@@ -662,6 +663,7 @@ def scrape_contracts(
     Args:
         start_page: Starting page number (1-indexed)
         max_pages: Maximum number of pages to scrape
+        max_contracts: Optional hard limit on number of contracts to process
         output_file: Output JSON file path
         delay: Delay between requests in seconds
         min_price: Minimum accepted contract value in EUR (inclusive)
@@ -676,6 +678,8 @@ def scrape_contracts(
 
     if min_price is not None and max_price is not None and min_price > max_price:
         raise ValueError("min_price cannot be greater than max_price")
+    if max_contracts is not None and max_contracts <= 0:
+        raise ValueError("max_contracts must be greater than 0")
 
     session = requests.Session()
     session.headers.update({"User-Agent": user_agent})
@@ -720,6 +724,12 @@ def scrape_contracts(
                     )
 
                 for row in rows:
+                    if max_contracts is not None and contracts_processed >= max_contracts:
+                        logger.info(
+                            "Reached max_contracts=%d, stopping scrape", max_contracts
+                        )
+                        break
+
                     try:
                         contract_data = dict(row)
                         contract_data["scraped_at"] = (
@@ -774,6 +784,9 @@ def scrape_contracts(
                             f"Error processing contract {row.get('contract_id')}: {e}"
                         )
                         continue
+
+                if max_contracts is not None and contracts_processed >= max_contracts:
+                    break
 
             out_f.write("\n]\n")
 

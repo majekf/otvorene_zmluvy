@@ -12,6 +12,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any, List
 
 # Fields that must exist on every record with their default values
 DEFAULT_FIELDS = {
@@ -19,6 +20,49 @@ DEFAULT_FIELDS = {
     "pdf_text_summary": "not_summarized",
     "award_type": "unknown",
 }
+
+
+def _backfill_defaults(record: dict[str, Any]) -> dict[str, Any]:
+    """Backfill required GovLens fields without overwriting existing values."""
+    for field, default_value in DEFAULT_FIELDS.items():
+        if field not in record:
+            record[field] = default_value
+    return record
+
+
+def _load_records(input_path: str) -> List[dict[str, Any]]:
+    """
+    Load records from either NDJSON or JSON-array files.
+
+    This keeps backwards compatibility with old NDJSON outputs while also
+    supporting newer scraper outputs that are written as JSON arrays.
+    """
+    text = Path(input_path).read_text(encoding="utf-8").strip()
+    if not text:
+        return []
+
+    # First, try JSON array input.
+    try:
+        payload = json.loads(text)
+        if isinstance(payload, list):
+            return [item for item in payload if isinstance(item, dict)]
+    except json.JSONDecodeError:
+        pass
+
+    # Fallback to NDJSON parsing.
+    records: List[dict[str, Any]] = []
+    with open(input_path, "r", encoding="utf-8") as f:
+        for line_num, line in enumerate(f, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                parsed = json.loads(line)
+                if isinstance(parsed, dict):
+                    records.append(parsed)
+            except json.JSONDecodeError as e:
+                print(f"Warning: Skipping line {line_num}: {e}", file=sys.stderr)
+    return records
 
 
 def migrate_ndjson_to_json(input_path: str, output_path: str) -> int:
@@ -34,25 +78,7 @@ def migrate_ndjson_to_json(input_path: str, output_path: str) -> int:
     Returns:
         Number of records successfully processed.
     """
-    records: list = []
-
-    with open(input_path, "r", encoding="utf-8") as f:
-        for line_num, line in enumerate(f, 1):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                record = json.loads(line)
-                # Backfill missing fields — keep existing values intact
-                for field, default_value in DEFAULT_FIELDS.items():
-                    if field not in record:
-                        record[field] = default_value
-                records.append(record)
-            except json.JSONDecodeError as e:
-                print(
-                    f"Warning: Skipping line {line_num}: {e}",
-                    file=sys.stderr,
-                )
+    records = [_backfill_defaults(record) for record in _load_records(input_path)]
 
     # Ensure the output directory exists
     output = Path(output_path)
