@@ -34,10 +34,11 @@ export default function ChatBar({ filters, onFilterUpdate, contractCount }: Chat
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [status, setStatus] = useState<ChatStatusResponse | null>(null);
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [provenance, setProvenance] = useState<ProvenanceItem[]>([]);
   const [showSources, setShowSources] = useState(false);
   const [scopeRefusal, setScopeRefusal] = useState<ScopeRefusalData | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const [sessionId] = useState(() => crypto.randomUUID?.() || Math.random().toString(36).slice(2));
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -84,9 +85,11 @@ export default function ChatBar({ filters, onFilterUpdate, contractCount }: Chat
     // degraded = mock mode; WebSocket still works, just returns mock responses
 
     setInput('');
+    setExpanded(true);
     setScopeRefusal(null);
     setProvenance([]);
     setShowSources(false);
+    setConnectionError(null);
 
     // Add user message
     setMessages((prev) => [...prev, { role: 'user', content: text }]);
@@ -176,6 +179,25 @@ export default function ChatBar({ filters, onFilterUpdate, contractCount }: Chat
     };
 
     ws.onerror = () => {
+      setConnectionError('Unable to connect to chat service. Please try again.');
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === 'assistant' && last.content === '') {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            role: 'assistant',
+            content: 'Connection error: unable to reach chat backend.',
+          };
+          return updated;
+        }
+        return [
+          ...prev,
+          {
+            role: 'assistant',
+            content: 'Connection error: unable to reach chat backend.',
+          },
+        ];
+      });
       setStreaming(false);
     };
 
@@ -226,25 +248,46 @@ export default function ChatBar({ filters, onFilterUpdate, contractCount }: Chat
   };
 
   const isDegraded = status?.degraded ?? true;
+  const unreadCount = expanded ? 0 : messages.filter((m) => m.role === 'assistant').length;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-t border-slate-200/60 shadow-2xl">
-      {/* Toggle bar */}
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 bg-slate-50/80 hover:bg-slate-100/80 flex items-center justify-between transition-colors"
-        aria-expanded={expanded}
-        aria-label="Toggle chat panel"
-      >
-        <span className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-primary-500" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" /></svg>
-          GovLens Chat
-        </span>
-        <svg className={`w-4 h-4 text-slate-400 transition-transform ${expanded ? '' : 'rotate-180'}`} fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
-      </button>
+    <div className="fixed bottom-4 right-4 z-50 w-[calc(100vw-2rem)] max-w-[420px]" data-testid="chat-popup-root">
+      {!expanded && (
+        <button
+          onClick={() => setExpanded(true)}
+          className="ml-auto flex items-center gap-2 rounded-full bg-gradient-to-br from-primary-600 to-primary-700 text-white px-4 py-3 shadow-xl shadow-primary-700/25 hover:shadow-primary-700/35 transition-shadow"
+          aria-expanded={expanded}
+          aria-label="Open chat panel"
+          data-testid="chat-launcher"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" /></svg>
+          <span className="text-sm font-semibold">GovLens Chat</span>
+          {unreadCount > 0 && (
+            <span className="inline-flex items-center justify-center min-w-5 h-5 rounded-full bg-white/20 px-1.5 text-xs font-bold">
+              {unreadCount}
+            </span>
+          )}
+        </button>
+      )}
 
       {expanded && (
-        <div className="flex flex-col" style={{ height: '350px' }}>
+        <div className="flex flex-col rounded-2xl border border-slate-200/70 bg-white/95 backdrop-blur-xl shadow-2xl overflow-hidden" style={{ height: 'min(75vh, 560px)' }}>
+          {/* Header */}
+          <div className="px-4 py-3 text-left text-sm font-medium text-slate-700 bg-slate-50/90 border-b border-slate-200/70 flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-primary-500" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" /></svg>
+              GovLens Chat
+            </span>
+            <button
+              onClick={() => setExpanded(false)}
+              className="btn-ghost p-1.5"
+              aria-label="Minimize chat panel"
+              data-testid="chat-minimize"
+            >
+              <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14" /></svg>
+            </button>
+          </div>
+
           {/* Degraded banner */}
           {isDegraded && (
             <div
@@ -253,6 +296,12 @@ export default function ChatBar({ filters, onFilterUpdate, contractCount }: Chat
               data-testid="degraded-banner"
             >
               Demo mode — no LLM API key configured. Responses are generated by MockLLMClient.
+            </div>
+          )}
+
+          {connectionError && (
+            <div className="bg-red-50 border-b border-red-200/70 px-4 py-2 text-sm text-red-700" role="alert" data-testid="chat-connection-error">
+              {connectionError}
             </div>
           )}
 

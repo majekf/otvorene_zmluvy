@@ -31,6 +31,7 @@ import type {
 } from './types';
 
 const BASE = '';
+const API_URL = (import.meta.env.VITE_API_URL || '').trim();
 
 function filterParams(filters: FilterState): Record<string, string> {
   const p: Record<string, string> = {};
@@ -272,6 +273,13 @@ export async function saveChat(
  * Auto-detects protocol (ws/wss) from the current page.
  */
 export function chatWebSocketUrl(): string {
+  // Prefer explicit backend URL when provided (e.g. docker dev profile).
+  // Otherwise, use same-origin so Vite proxy can route /api requests.
+  if (API_URL) {
+    const url = new URL(API_URL);
+    const wsProto = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${wsProto}//${url.host}/api/chat`;
+  }
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${proto}//${window.location.host}/api/chat`;
 }

@@ -16,12 +16,12 @@
 
 | Component | Status | Details |
 |-----------|--------|---------|
-| **Ingestion / Scraper** | ✅ Complete | `src/scraper.py` (454 LOC) — paginates `crz.gov.sk`, extracts listing rows, fetches detail pages, downloads PDFs, extracts text via `pdfplumber`, outputs NDJSON |
-| **CLI entry point** | ✅ Complete | `scrape_crz.py` — argparse with `--start-page`, `--max-pages`, `--out`, `--delay`, `--user-agent`, `--pdf-dir`, `--log-level` |
+| **Ingestion / Scraper** | ✅ Complete | `src/scraper.py` — paginates `crz.gov.sk`, extracts listing rows, fetches detail pages, downloads PDFs, extracts text via `pdfplumber`, and automatically uses OCR fallback (`tesseract`) when PDFs are scanned/non-selectable |
+| **CLI entry point** | ✅ Complete | `scrape_crz.py` — argparse with scrape flags plus OCR JSON backfill mode: `--ocr-json`, `--ocr-out`, `--ocr-min-chars`, `--ocr-lang` |
 | **Price parsing** | ✅ Complete | Slovak format `28 978,27 €` → `28978.27` with NBSP handling |
 | **Date parsing** | ✅ Complete | Slovak month names → ISO, DD.MM.YYYY → ISO |
-| **PDF download + text extraction** | ✅ Complete | `pdfplumber`, truncated at 50 000 chars |
-| **Unit tests** | ✅ Complete | 341 backend (+ 1 skipped) + 184 frontend tests — `test_parser.py` (prices, dates), `test_integration.py` (scraper smoke), `test_models.py` (Phase 0, 24 tests), `test_migrate.py` (Phase 0, 15 tests), `test_engine.py` (Phase 1 + 6, 95 tests), `test_api.py` (Phase 2 + 6, 46 tests), `test_rules.py` (Phase 4, 37 tests), `test_chatbot.py` (Phase 5, 49 passed + 1 skipped), `test_workspace.py` (Phase 7, 5 tests), `test_export.py` (Phase 7, 5 tests), `test_url_state.py` (Phase 7, 5 tests), `test_e2e.py` (Phase 8, 15 tests), `test_performance.py` (Phase 8, 14 tests); 22 frontend test files (184 tests via vitest) including Phase 3 AllContracts + AccordionContracts, Phase 6 pages and Phase 7 WorkspaceToolbar. The skipped tests require `OPENAI_API_KEY` or a live Redis server — they are marked `@requires_openai_key` / `@requires_redis` and report SKIPPED when the service is absent. |
+| **PDF download + text extraction** | ✅ Complete | primary extraction via `pdfplumber` (truncated at 50 000 chars) with OCR fallback for scanned PDFs using `pypdfium2` + `tesseract` |
+| **Unit tests** | ✅ Complete | 341 backend (+ 1 skipped) + 135 frontend tests — `test_parser.py` (prices, dates), `test_integration.py` (scraper smoke), `test_models.py` (Phase 0, 24 tests), `test_migrate.py` (Phase 0, 15 tests), `test_engine.py` (Phase 1 + 6, 95 tests), `test_api.py` (Phase 2 + 6, 46 tests), `test_rules.py` (Phase 4, 37 tests), `test_chatbot.py` (Phase 5, 49 passed + 1 skipped), `test_workspace.py` (Phase 7, 5 tests), `test_export.py` (Phase 7, 5 tests), `test_url_state.py` (Phase 7, 5 tests), `test_e2e.py` (Phase 8, 15 tests), `test_performance.py` (Phase 8, 14 tests); 20 frontend test files (135 tests via vitest) including Phase 6 pages and Phase 7 WorkspaceToolbar. The skipped tests require `OPENAI_API_KEY` or a live Redis server — they are marked `@requires_openai_key` / `@requires_redis` and report SKIPPED when the service is absent. |
 | **Documentation** | ✅ Complete | README, ARCHITECTURE, QUICKSTART, START_HERE, PROJECT_COMPLETION, DELIVERY_SUMMARY, INDEX — all updated for Phase 0 and Phase 1 |
 | **Dependencies** | ✅ Pinned | `requirements.in` / `requirements.txt` — requests, beautifulsoup4, lxml, pdfplumber, pytest, pydantic>=2.0, python-dotenv, fastapi, uvicorn[standard], httpx, reportlab |
 | **Output format** | ✅ NDJSON | One JSON object per line; fields: listing, detail, PDF, `scraped_at`, `category`, `pdf_text_summary`, `award_type` |
@@ -727,3 +727,37 @@ Additionally, the test was pre-filtering institution names that contained commas
 | Chatbot LLM | Anthropic Claude (claude-sonnet) via `anthropic` SDK | Per design doc specification |
 | PDF export | WeasyPrint or ReportLab | Python-native PDF generation |
 | Deployment | Docker + docker-compose | Single-command startup |
+
+---
+
+## 4 - SCRAPER CHANGE UPDATE (2026-03-07)
+
+### 4.1 Requested Scope Completed
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Price filter support (`min_price`, `max_price`) | DONE | Added to CLI and scraper pipeline; applied immediately after listing extraction and before detail/PDF requests |
+| Additional field scraping (`rezort`) | DONE | Added extraction from detail page and exported in NDJSON |
+| Request throttling (3 seconds) | DONE | Default delay set to 3.0s; global request throttler enforces spacing between all HTTP calls (listing, detail, PDF) |
+| Full validation of "Identifik�cia a zmluvy" | DONE | Parser now stores all label/value pairs under `identification_fields` and ordered `identification_section_items` |
+| Documentation/plan update | DONE | README arguments/output updated and this implementation plan section added |
+
+### 4.2 Files Updated
+
+- `src/scraper.py`
+- `scrape_crz.py`
+- `tests/test_integration.py`
+- `tests/test_parser.py`
+- `README.md`
+- `IMPLEMENTATION_PLAN.md`
+
+### 4.3 "Identifik�cia a zmluvy" Coverage Confirmation
+
+Current parser behavior now includes:
+
+- Explicit mapped fields: `contract_type`, `rezort`, `contract_number_detail`, `contract_id_detail`, `buyer_detail`, `supplier_detail`, `ico_buyer`, `ico_supplier`, `ico_rezort`
+- Complete raw section capture for all fields present on the page:
+  - `identification_fields` (label -> value, duplicates preserved as lists)
+  - `identification_section_items` (ordered list of `{label, value}`)
+
+This provides full section-level coverage even when CRZ adds or changes labels.

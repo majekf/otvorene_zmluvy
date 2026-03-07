@@ -66,6 +66,8 @@ function Breadcrumbs() {
 /** Inner shell that can access FilterContext for ChatBar filters. */
 function AppShell() {
   const { filters } = useFilterContext();
+  const { pathname } = useLocation();
+  const showChat = pathname === '/';
 
   return (
     <div className="min-h-screen text-slate-900">
@@ -97,7 +99,7 @@ function AppShell() {
         </div>
       </header>
 
-      <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-7xl mx-auto pb-28">
+      <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-7xl mx-auto">
         <Breadcrumbs />
         <ErrorBoundary>
           <Routes>
@@ -113,13 +115,13 @@ function AppShell() {
         </ErrorBoundary>
       </main>
 
-      <footer className="text-center text-xs text-slate-400 py-6 border-t border-slate-100 pb-20 bg-white/40">
+      <footer className="text-center text-xs text-slate-400 py-6 border-t border-slate-100 bg-white/40">
         <span className="font-medium">GovLens</span> &middot; Data from{' '}
         <a href="https://crz.gov.sk" target="_blank" rel="noopener noreferrer" className="hover:text-primary-600 transition-colors">crz.gov.sk</a>
       </footer>
 
-      {/* Chatbot — receives the live shared filter so context is always current */}
-      <ChatBar filters={filters} />
+      {/* Chatbot shown only on dashboard */}
+      {showChat && <ChatBar filters={filters} />}
     </div>
   );
 }

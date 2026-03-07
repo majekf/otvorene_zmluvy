@@ -338,14 +338,19 @@ make test
 
 ### PDFs from Scanned Documents
 
-Some PDFs are scanned images without OCR. `pdfplumber` extracts text only from text-based PDFs.
+Some PDFs are scanned images without selectable text. The scraper now tries OCR fallback automatically when `pdfplumber` extracts too little text.
 
-**Solution**: If you need OCR, add `pytesseract` and `wand`:
+OCR fallback requires `tesseract` installed and available in `PATH`.
+
+You can also enrich an already scraped JSON file:
+
 ```bash
-pip install pytesseract wand
+python scrape_crz.py --ocr-json data/contracts.json --ocr-out data/contracts_ocr.json
 ```
 
-Then modify the PDF extraction code to use OCR for images.
+Optional OCR flags:
+- `--ocr-min-chars 30` (threshold for readable text)
+- `--ocr-lang slk+eng` (Tesseract language pack selection)
 
 ### Pagination
 
