@@ -3,8 +3,8 @@
 CLI entry point for CRZ scraper.
 
 Usage:
-    python scrape_crz.py --start-page 1 --max-pages 3 --out out.ndjson
-    python scrape_crz.py --start-page 1 --max-pages 100 --out contracts.ndjson --delay 1.0
+    python scrape_crz.py --start-page 1 --max-pages 3 --out out.json
+    python scrape_crz.py --start-page 1 --max-pages 100 --out contracts.json --delay 3.0
 """
 
 import argparse
@@ -25,7 +25,7 @@ def main():
         epilog="""
 Examples:
   python scrape_crz.py --start-page 1 --max-pages 3
-  python scrape_crz.py --start-page 1 --max-pages 100 --out contracts.ndjson --delay 1.0
+  python scrape_crz.py --start-page 1 --max-pages 100 --out contracts.json --delay 3.0
         """
     )
     
@@ -46,15 +46,29 @@ Examples:
     parser.add_argument(
         "--out",
         type=str,
-        default="out.ndjson",
-        help="Output NDJSON file path (default: out.ndjson)"
+        default="out.json",
+        help="Output JSON file path (default: out.json)"
     )
     
     parser.add_argument(
         "--delay",
         type=float,
-        default=0.5,
-        help="Delay between requests in seconds (default: 0.5)"
+        default=3.0,
+        help="Delay between requests in seconds (default: 3.0)"
+    )
+
+    parser.add_argument(
+        "--min-price",
+        type=float,
+        default=None,
+        help="Minimum contract price in EUR (inclusive, optional)"
+    )
+
+    parser.add_argument(
+        "--max-price",
+        type=float,
+        default=None,
+        help="Maximum contract price in EUR (inclusive, optional)"
     )
     
     parser.add_argument(
@@ -93,6 +107,8 @@ Examples:
     logger.info(f"  Max pages: {args.max_pages}")
     logger.info(f"  Output: {args.out}")
     logger.info(f"  Delay: {args.delay}s")
+    logger.info(f"  Min price: {args.min_price}")
+    logger.info(f"  Max price: {args.max_price}")
     logger.info(f"  PDF dir: {args.pdf_dir}")
     
     try:
@@ -101,6 +117,8 @@ Examples:
             max_pages=args.max_pages,
             output_file=args.out,
             delay=args.delay,
+            min_price=args.min_price,
+            max_price=args.max_price,
             user_agent=args.user_agent,
             pdf_dir=args.pdf_dir,
         )
@@ -110,10 +128,13 @@ Examples:
         # Verify output file
         output_path = Path(args.out)
         if output_path.exists():
-            lines = output_path.read_text(encoding="utf-8").strip().split("\n")
-            logger.info(f"Output file contains {len(lines)} lines")
-            if lines:
-                logger.info(f"First contract: {lines[0][:100]}...")
+            import json
+
+            contracts = json.loads(output_path.read_text(encoding="utf-8"))
+            logger.info(f"Output file contains {len(contracts)} contracts")
+            if contracts:
+                first_contract = json.dumps(contracts[0], ensure_ascii=False)
+                logger.info(f"First contract: {first_contract[:100]}...")
         
         return 0
     
@@ -124,3 +145,4 @@ Examples:
 
 if __name__ == "__main__":
     sys.exit(main())
+

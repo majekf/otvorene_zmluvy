@@ -701,3 +701,37 @@ Phase 8: Polish & Deployment ← depends on ALL prior phases
 | Chatbot LLM | Anthropic Claude (claude-sonnet) via `anthropic` SDK | Per design doc specification |
 | PDF export | WeasyPrint or ReportLab | Python-native PDF generation |
 | Deployment | Docker + docker-compose | Single-command startup |
+
+---
+
+## 4 - SCRAPER CHANGE UPDATE (2026-03-07)
+
+### 4.1 Requested Scope Completed
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Price filter support (`min_price`, `max_price`) | DONE | Added to CLI and scraper pipeline; applied immediately after listing extraction and before detail/PDF requests |
+| Additional field scraping (`rezort`) | DONE | Added extraction from detail page and exported in NDJSON |
+| Request throttling (3 seconds) | DONE | Default delay set to 3.0s; global request throttler enforces spacing between all HTTP calls (listing, detail, PDF) |
+| Full validation of "Identifik�cia a zmluvy" | DONE | Parser now stores all label/value pairs under `identification_fields` and ordered `identification_section_items` |
+| Documentation/plan update | DONE | README arguments/output updated and this implementation plan section added |
+
+### 4.2 Files Updated
+
+- `src/scraper.py`
+- `scrape_crz.py`
+- `tests/test_integration.py`
+- `tests/test_parser.py`
+- `README.md`
+- `IMPLEMENTATION_PLAN.md`
+
+### 4.3 "Identifik�cia a zmluvy" Coverage Confirmation
+
+Current parser behavior now includes:
+
+- Explicit mapped fields: `contract_type`, `rezort`, `contract_number_detail`, `contract_id_detail`, `buyer_detail`, `supplier_detail`, `ico_buyer`, `ico_supplier`, `ico_rezort`
+- Complete raw section capture for all fields present on the page:
+  - `identification_fields` (label -> value, duplicates preserved as lists)
+  - `identification_section_items` (ordered list of `{label, value}`)
+
+This provides full section-level coverage even when CRZ adds or changes labels.
