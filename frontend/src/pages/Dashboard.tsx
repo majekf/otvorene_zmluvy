@@ -17,6 +17,7 @@ import WorkspaceToolbar from '../components/WorkspaceToolbar';
 import TreemapChart from '../components/TreemapChart';
 import BarChart from '../components/BarChart';
 import CategoryAccordion from '../components/CategoryAccordion';
+import AccordionContracts from '../components/AccordionContracts';
 import ContractsTable from '../components/ContractsTable';
 import Pagination from '../components/Pagination';
 import RulePanel from '../components/RulePanel';
@@ -179,9 +180,11 @@ export default function Dashboard() {
         <CategoryAccordion
           groups={aggregations.results}
           renderExpanded={(groupValue) => (
-            <div className="text-sm text-gray-600 px-4 pb-3">
-              {groupValue}
-            </div>
+            <AccordionContracts
+              filters={filters}
+              groupBy={groupBy}
+              groupValue={groupValue}
+            />
           )}
         />
       )}
