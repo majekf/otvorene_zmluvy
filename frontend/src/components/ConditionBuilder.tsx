@@ -88,10 +88,6 @@ export default function ConditionBuilder({ filters, onResult }: ConditionBuilder
     }
   }, [conditions, logic, filters, onResult]);
 
-  const getGroup = useCallback((): ConditionGroupData => {
-    return { logic, conditions };
-  }, [logic, conditions]);
-
   return (
     <div data-testid="condition-builder" className="space-y-3">
       <h3 className="section-title">Custom Condition Builder</h3>

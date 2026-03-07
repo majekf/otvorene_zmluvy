@@ -11,8 +11,8 @@ import type { FilterState } from '../types';
 
 // Mock the api module
 vi.mock('../api', () => ({
-  csvExportUrl: (filters: FilterState) => `/api/export/csv?mock=true`,
-  pdfExportUrl: (filters: FilterState) => `/api/export/pdf?mock=true`,
+  csvExportUrl: () => `/api/export/csv?mock=true`,
+  pdfExportUrl: () => `/api/export/pdf?mock=true`,
   saveWorkspace: vi.fn().mockResolvedValue({
     token: 'mock-token',
     snapshot: { version: 1, filters: {}, saved_at: '2026-01-01T00:00:00Z' },

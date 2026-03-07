@@ -23,7 +23,6 @@ import type {
   RulePreset,
   Contract,
   TreemapNode,
-  TrendsResponse,
   TrendsResponseWithOverlays,
   VendorProfile,
   VendorSummary,
