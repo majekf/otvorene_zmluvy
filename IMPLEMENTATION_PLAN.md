@@ -643,6 +643,73 @@ Tests that require external services or API keys are decorated with conditional 
 
 ---
 
+### Phase 9 — Contracts vs Subcontractors Comparison
+
+**Goal:** Add a second data source (subcontractors) and a clustered bar chart comparison view, allowing users to compare aggregated metrics from the primary contracts dataset against the subcontractors dataset side-by-side.
+
+**Status: ✅ COMPLETE**
+
+**Dependencies:** Phase 2 (API), Phase 3 (Frontend UI), Phase 6 (Investigation Modes — FilterBar, GroupByControl, WorkspaceToolbar).
+
+#### Design Decision: Data Transformation vs Engine Abstraction
+
+The assistant initially proposed adding a `vendor_field` parameter throughout the engine (group_by, top_n_vendors, vendors, filter). This approach was **rejected** because:
+- It modifies core methods used by all existing functionality, risking regressions.
+- It adds complexity to well-tested code paths for a single use case.
+
+**Chosen approach: Data transformation at load time.** The subcontractors JSON has both `supplier`/`ico_supplier` (original supplier) and `subcontractor`/`ico_subcontractor` fields. During startup, the `subcontractor` → `supplier` and `ico_subcontractor` → `ico_supplier` fields are remapped, so the existing DataStore engine works identically on the transformed data with **zero changes to the engine**.
+
+#### Tasks
+
+| # | Task | Status |
+|---|------|--------|
+| 9.1 | Add `GOVLENS_SUBCONTRACTORS_DATA_PATH` to `src/config.py` Settings | ✅ DONE |
+| 9.2 | Load second DataStore (`sub_store`) in `api.py` lifespan with field remapping (`subcontractor` → `supplier`, `ico_subcontractor` → `ico_supplier`) | ✅ DONE |
+| 9.3 | Add `get_sub_store()` dependency in `api.py` | ✅ DONE |
+| 9.4 | Create `GET /api/compare/aggregations` endpoint — runs `aggregate_groups` on both stores, merges into clustered data | ✅ DONE |
+| 9.5 | Add `CompareAggregationRow` and `CompareAggregationsResponse` types to `frontend/src/types.ts` | ✅ DONE |
+| 9.6 | Add `fetchCompareAggregations()` to `frontend/src/api.ts` | ✅ DONE |
+| 9.7 | Create `ClusteredBarChart.tsx` component — Recharts clustered horizontal bar chart with two bars per group | ✅ DONE |
+| 9.8 | Create `CompareView.tsx` page — filters, group-by, metric selector, summary cards, clustered chart | ✅ DONE |
+| 9.9 | Add `/compare` route and "Compare" nav link in `App.tsx` | ✅ DONE |
+| 9.10 | Update `.env.example` and `docker-compose.yml` with new env variable | ✅ DONE |
+| 9.11 | Backend tests: `tests/test_compare.py` — 19 tests (response shape, filter pass-through, no-sub-store fallback, data transformation) | ✅ DONE |
+| 9.12 | Frontend tests: `ClusteredBarChart.test.tsx` (5 tests), `CompareView.test.tsx` (6 tests) | ✅ DONE |
+
+#### Unit Tests for Phase 9
+
+- `tests/test_compare.py::TestCompareAggregations` (12 tests) — endpoint 200, response shape, group-by variants, filter pass-through, date filter, sort order, merged groups
+- `tests/test_compare.py::TestCompareNoSubStore` (4 tests) — graceful fallback when sub_store is None, has_subcontractors flag, zeroed summaries
+- `tests/test_compare.py::TestSubStoreDataTransformation` (3 tests) — field remapping correctness, field preservation, engine aggregation with remapped vendors
+- `frontend/src/__tests__/ClusteredBarChart.test.tsx` (5 tests) — render, empty data, metric variants, custom labels
+- `frontend/src/__tests__/CompareView.test.tsx` (6 tests) — page render, data loading, metric switching, no-sub warning, API call verification
+
+**Total: 30 new tests (19 backend + 11 frontend)**
+
+#### Files Changed
+
+| File | Change |
+|------|--------|
+| `src/config.py` | Added `subcontractors_data_path` setting |
+| `src/api.py` | Extended lifespan with sub_store loading, added `get_sub_store()`, added `/api/compare/aggregations` endpoint |
+| `frontend/src/types.ts` | Added `CompareAggregationRow`, `CompareAggregationsResponse` interfaces |
+| `frontend/src/api.ts` | Added `fetchCompareAggregations()` |
+| `frontend/src/components/ClusteredBarChart.tsx` | **NEW** — Recharts clustered bar chart component |
+| `frontend/src/pages/CompareView.tsx` | **NEW** — Comparison page with filters, metrics, summary cards |
+| `frontend/src/App.tsx` | Added CompareView import, route `/compare`, and nav link |
+| `.env.example` | Added `GOVLENS_SUBCONTRACTORS_DATA_PATH` |
+| `docker-compose.yml` | Added `GOVLENS_SUBCONTRACTORS_DATA_PATH` env var |
+| `tests/test_compare.py` | **NEW** — 19 backend tests |
+| `frontend/src/__tests__/ClusteredBarChart.test.tsx` | **NEW** — 5 component tests |
+| `frontend/src/__tests__/CompareView.test.tsx` | **NEW** — 6 page tests |
+
+#### Unlocks
+
+- Side-by-side comparison of contracts vs subcontractors across all existing grouping dimensions.
+- Foundation for additional multi-source analysis features.
+
+---
+
 ## 3 — FINAL SUMMARY
 
 ### 3.1 Full Dependency Map
@@ -669,6 +736,7 @@ Phase 0: Foundation (Schema, Data Model, Restructure)
    └──► All phases depend on Phase 0
 
 Phase 8: Polish & Deployment ← depends on ALL prior phases
+Phase 9: Compare (Contracts vs Subcontractors) ← depends on Phase 2, 3, 6
 ```
 
 ### 3.2 Recommended Implementation Order
@@ -684,6 +752,7 @@ Phase 8: Polish & Deployment ← depends on ALL prior phases
 | 7th | **Phase 6** — Investigation Modes | 3–4 days | ✅ **COMPLETE** | Extends existing UI infrastructure |
 | 8th | **Phase 7** — State & Export | 2–3 days | ✅ **COMPLETE** | Polishes the experience; depends on stable views |
 | 9th | **Phase 8** — Polish & Deploy | 2–3 days | ✅ **COMPLETE** | Final pass |
+| 10th | **Phase 9** — Compare (Contracts vs Subcontractors) | 1–2 days | ✅ **COMPLETE** | Second data source + clustered chart |
 
 **Total estimated effort: 24–35 working days | Completed: ~24–35 days (All phases complete)**
 

@@ -186,6 +186,36 @@ export type SortSpec = [string, string][];
 
 export type GroupByField = 'category' | 'supplier' | 'buyer' | 'month' | 'award_type';
 
+// ── Phase 9: Compare (Contracts vs Subcontractors) types ────────────
+
+export interface CompareAggregationRow {
+  group_value: string;
+  contracts_total_spend: number;
+  contracts_contract_count: number;
+  contracts_avg_value: number;
+  subcontractors_total_spend: number;
+  subcontractors_contract_count: number;
+  subcontractors_avg_value: number;
+}
+
+export interface CompareAggregationsResponse {
+  group_by: string;
+  data: CompareAggregationRow[];
+  contracts_summary: {
+    total_spend: number;
+    contract_count: number;
+    avg_value: number;
+    max_value: number;
+  };
+  subcontractors_summary: {
+    total_spend: number;
+    contract_count: number;
+    avg_value: number;
+    max_value: number;
+  };
+  has_subcontractors: boolean;
+}
+
 // ── Phase 4: Rule Builder types ─────────────────────────────────────
 
 export interface RulePreset {

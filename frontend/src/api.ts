@@ -11,6 +11,7 @@ import type {
   BenchmarkResponse,
   BenchmarkPeersResponse,
   BenchmarkMultiMetricResponse,
+  CompareAggregationsResponse,
   ConditionGroupData,
   CustomRuleResponse,
   FilterState,
@@ -91,6 +92,16 @@ export async function fetchAggregations(
 ): Promise<AggregationsResponse> {
   const p = { ...filterParams(filters), group_by: groupBy };
   return get<AggregationsResponse>(`/api/aggregations${qs(p)}`);
+}
+
+// ── Compare (Contracts vs Subcontractors) ───────────────────────────
+
+export async function fetchCompareAggregations(
+  filters: FilterState = {},
+  groupBy: GroupByField = 'category',
+): Promise<CompareAggregationsResponse> {
+  const p = { ...filterParams(filters), group_by: groupBy };
+  return get<CompareAggregationsResponse>(`/api/compare/aggregations${qs(p)}`);
 }
 
 // ── Treemap ─────────────────────────────────────────────────────────

@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load the DataStore at startup."""
+    """Load the DataStore(s) at startup."""
     data_path = Path(settings.data_path)
     try:
         if data_path.exists():
@@ -63,6 +63,28 @@ async def lifespan(app: FastAPI):
             app.state.store = DataStore()
     except Exception:
         app.state.store = DataStore()
+
+    # Load subcontractors store (optional second data source)
+    app.state.sub_store = None
+    sub_path_str = settings.subcontractors_data_path
+    if sub_path_str:
+        sub_path = Path(sub_path_str)
+        if sub_path.exists():
+            try:
+                raw = json.loads(sub_path.read_text(encoding="utf-8"))
+                # Remap subcontractor → supplier so the engine reuses all
+                # existing vendor logic without modification.
+                for record in raw:
+                    if "subcontractor" in record:
+                        record["supplier"] = record["subcontractor"]
+                    if "ico_subcontractor" in record:
+                        record["ico_supplier"] = record["ico_subcontractor"]
+                sub_store = DataStore()
+                sub_store.load_from_list(raw)
+                app.state.sub_store = sub_store
+            except Exception:
+                logger.warning("Failed to load subcontractors data from %s", sub_path_str)
+
     yield
 
 
@@ -110,6 +132,11 @@ app.add_middleware(
 def get_store() -> DataStore:
     """Return the application DataStore instance."""
     return app.state.store
+
+
+def get_sub_store() -> Optional[DataStore]:
+    """Return the subcontractors DataStore instance, or None."""
+    return getattr(app.state, "sub_store", None)
 
 
 def parse_filters(
@@ -306,6 +333,69 @@ def get_aggregations(
         "group_by": group_by,
         "results": [r.model_dump() for r in results],
         "summary": store.aggregate(filtered),
+    }
+
+
+# ── Endpoints — Compare (Contracts vs Subcontractors) ────────────────
+
+
+@app.get("/api/compare/aggregations")
+def get_compare_aggregations(
+    store: DataStore = Depends(get_store),
+    sub_store: Optional[DataStore] = Depends(get_sub_store),
+    filters: FilterState = Depends(parse_filters),
+    group_by: str = Query(
+        "category", description="Field to group by"
+    ),
+):
+    """Compare aggregations from contracts vs subcontractors, grouped by field.
+
+    Returns merged data with both contract and subcontractor values
+    per group, suitable for clustered bar charts.
+    """
+    # Primary store aggregations
+    filtered = store.filter(filters)
+    primary_results = store.aggregate_groups(group_by, filtered)
+    primary_summary = store.aggregate(filtered)
+
+    # Subcontractors store aggregations
+    sub_results_list = []
+    sub_summary = {"total_spend": 0, "contract_count": 0, "avg_value": 0, "max_value": 0}
+    if sub_store is not None:
+        sub_filtered = sub_store.filter(filters)
+        sub_results_list = sub_store.aggregate_groups(group_by, sub_filtered)
+        sub_summary = sub_store.aggregate(sub_filtered)
+
+    # Merge into clustered data: one row per group_value
+    sub_map = {r.group_value: r for r in sub_results_list}
+    all_keys = list(dict.fromkeys(
+        [r.group_value for r in primary_results] +
+        [r.group_value for r in sub_results_list]
+    ))
+
+    merged = []
+    for key in all_keys:
+        p = next((r for r in primary_results if r.group_value == key), None)
+        s = sub_map.get(key)
+        merged.append({
+            "group_value": key,
+            "contracts_total_spend": p.total_spend if p else 0,
+            "contracts_contract_count": p.contract_count if p else 0,
+            "contracts_avg_value": p.avg_value if p else 0,
+            "subcontractors_total_spend": s.total_spend if s else 0,
+            "subcontractors_contract_count": s.contract_count if s else 0,
+            "subcontractors_avg_value": s.avg_value if s else 0,
+        })
+
+    # Sort by primary total_spend descending
+    merged.sort(key=lambda r: r["contracts_total_spend"], reverse=True)
+
+    return {
+        "group_by": group_by,
+        "data": merged,
+        "contracts_summary": primary_summary,
+        "subcontractors_summary": sub_summary,
+        "has_subcontractors": sub_store is not None,
     }
 
 
