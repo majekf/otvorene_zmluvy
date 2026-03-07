@@ -50,7 +50,11 @@ const COLUMNS: ColumnDef[] = [
     sortable: true,
     render: (c) =>
       c.supplier ? (
-        <Link to={`/vendor/${encodeURIComponent(c.supplier)}`} className="text-primary-600 hover:text-primary-800 transition-colors">
+        <Link
+          to={`/vendor/${encodeURIComponent(c.supplier)}`}
+          className="text-primary-600 hover:text-primary-800 transition-colors"
+          onClick={(e) => e.stopPropagation()}
+        >
           {c.supplier}
         </Link>
       ) : (
@@ -63,7 +67,11 @@ const COLUMNS: ColumnDef[] = [
     sortable: true,
     render: (c) =>
       c.buyer ? (
-        <Link to={`/institution/${encodeURIComponent(c.buyer)}`} className="text-primary-600 hover:text-primary-800 transition-colors">
+        <Link
+          to={`/institution/${encodeURIComponent(c.buyer)}`}
+          className="text-primary-600 hover:text-primary-800 transition-colors"
+          onClick={(e) => e.stopPropagation()}
+        >
           {c.buyer}
         </Link>
       ) : (
