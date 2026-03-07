@@ -127,6 +127,7 @@ class OpenAIClient(LLMClient):
 
     _MAX_RETRIES = 3
     _BASE_DELAY = 1.0  # seconds
+    _DEFAULT_TEMPERATURE = 0.2
 
     def __init__(
         self,
@@ -195,11 +196,13 @@ class OpenAIClient(LLMClient):
         if not self.available:
             raise RuntimeError("OpenAI client not available")
 
+        temperature = getattr(self, "_temperature", self._DEFAULT_TEMPERATURE)
+
         async def _call():
             resp = await self._client.chat.completions.create(
                 model=self._model,
                 messages=messages,
-                temperature=self._temperature,
+                temperature=temperature,
             )
             return resp.choices[0].message.content
 
@@ -219,6 +222,7 @@ class OpenAIClient(LLMClient):
 
         prompt_tokens = 0
         completion_tokens = 0
+        temperature = getattr(self, "_temperature", self._DEFAULT_TEMPERATURE)
 
         async def _call():
             nonlocal prompt_tokens, completion_tokens
@@ -228,7 +232,7 @@ class OpenAIClient(LLMClient):
                 stream=True,
                 stream_options={"include_usage": True},
                 stop=stop_tokens,
-                temperature=self._temperature,
+                temperature=temperature,
             )
             async for chunk in stream:
                 if chunk.usage:
