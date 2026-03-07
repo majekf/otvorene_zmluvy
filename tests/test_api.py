@@ -957,3 +957,134 @@ class TestRankingsEnhanced:
         assert "T-Systems Slovakia s.r.o." in vendors
         # SecurCorp only serves Ministerstvo
         assert "SecurCorp a.s." not in vendors
+
+
+class TestBenchmarkWithFilters:
+    """Tests for benchmark endpoints with global filter support."""
+
+    def test_benchmark_compare_with_date_filter(self, client):
+        """Benchmark compare respects date_from filter."""
+        # Only contracts from 2026 onward (1003=200k Košice, 1004=750k Ministerstvo, 1005=300k Košice)
+        r = client.get(
+            "/api/benchmark/compare",
+            params={
+                "institutions": "Mesto Bratislava|Mesto Košice",
+                "metrics": "total_spend,contract_count",
+                "date_from": "2026-01-01",
+            },
+        )
+        assert r.status_code == 200
+        data = r.json()
+        ba = next(r for r in data["results"] if r["institution"] == "Mesto Bratislava")
+        ke = next(r for r in data["results"] if r["institution"] == "Mesto Košice")
+        # Bratislava has no contracts from 2026 onward
+        assert ba["total_spend"] == 0
+        assert ba["contract_count"] == 0
+        # Košice has 1003 + 1005
+        assert ke["total_spend"] == 500_000
+        assert ke["contract_count"] == 2
+
+    def test_benchmark_compare_with_category_filter(self, client):
+        """Benchmark compare respects category filter."""
+        r = client.get(
+            "/api/benchmark/compare",
+            params={
+                "institutions": "Mesto Bratislava|Mesto Košice",
+                "metrics": "total_spend",
+                "categories": "construction",
+            },
+        )
+        assert r.status_code == 200
+        data = r.json()
+        ba = next(r for r in data["results"] if r["institution"] == "Mesto Bratislava")
+        ke = next(r for r in data["results"] if r["institution"] == "Mesto Košice")
+        # Bratislava has 1 construction contract (1001=1M)
+        assert ba["total_spend"] == 1_000_000
+        # Košice has 1 construction contract (1005=300k)
+        assert ke["total_spend"] == 300_000
+
+    def test_benchmark_compare_without_filter(self, client):
+        """Benchmark compare without filters uses all contracts (backwards compatible)."""
+        r = client.get(
+            "/api/benchmark/compare",
+            params={
+                "institutions": "Mesto Bratislava|Mesto Košice",
+                "metrics": "total_spend",
+            },
+        )
+        assert r.status_code == 200
+        data = r.json()
+        ba = next(r for r in data["results"] if r["institution"] == "Mesto Bratislava")
+        assert ba["total_spend"] == 1_500_000
+
+    def test_benchmark_endpoint_with_category_filter(self, client):
+        """Single-metric benchmark endpoint respects category filter."""
+        r = client.get(
+            "/api/benchmark",
+            params={
+                "institutions": "Mesto Bratislava|Mesto Košice",
+                "metric": "total_spend",
+                "categories": "construction",
+            },
+        )
+        assert r.status_code == 200
+        data = r.json()
+        ba = next(r for r in data["results"] if r["institution"] == "Mesto Bratislava")
+        assert ba["value"] == 1_000_000
+
+    def test_benchmark_peers_with_date_filter(self, client):
+        """Peer group respects date filter."""
+        # Only 2026 contracts: Košice has 2, Ministerstvo has 1
+        r = client.get(
+            "/api/benchmark/peers",
+            params={
+                "institution": "Mesto Košice",
+                "min_contracts": 1,
+                "date_from": "2026-01-01",
+            },
+        )
+        assert r.status_code == 200
+        data = r.json()
+        # Ministerstvo has 1 contract in 2026
+        assert "Ministerstvo vnútra SR" in data["peers"]
+        # Bratislava has 0 contracts in 2026
+        assert "Mesto Bratislava" not in data["peers"]
+
+    def test_benchmark_peers_with_category_filter(self, client):
+        """Peer group respects category filter."""
+        r = client.get(
+            "/api/benchmark/peers",
+            params={
+                "institution": "Mesto Bratislava",
+                "min_contracts": 1,
+                "categories": "construction",
+            },
+        )
+        assert r.status_code == 200
+        data = r.json()
+        # Košice has construction contract (1005)
+        assert "Mesto Košice" in data["peers"]
+        # Ministerstvo has no construction contracts
+        assert "Ministerstvo vnútra SR" not in data["peers"]
+
+    def test_benchmark_compare_with_value_range_filter(self, client):
+        """Benchmark compare respects value_min and value_max filters."""
+        # Only contracts >= 500k: 1001=1M, 1002=500k, 1004=750k
+        r = client.get(
+            "/api/benchmark/compare",
+            params={
+                "institutions": "Mesto Bratislava|Mesto Košice",
+                "metrics": "total_spend,contract_count",
+                "value_min": "500000",
+            },
+        )
+        assert r.status_code == 200
+        data = r.json()
+        ba = next(r for r in data["results"] if r["institution"] == "Mesto Bratislava")
+        ke = next(r for r in data["results"] if r["institution"] == "Mesto Košice")
+        # Bratislava: 1001(1M) + 1002(500k)
+        assert ba["total_spend"] == 1_500_000
+        assert ba["contract_count"] == 2
+        # Košice: no contracts >= 500k
+        assert ke["total_spend"] == 0
+        assert ke["contract_count"] == 0

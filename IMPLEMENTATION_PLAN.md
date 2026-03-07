@@ -21,7 +21,7 @@
 | **Price parsing** | ✅ Complete | Slovak format `28 978,27 €` → `28978.27` with NBSP handling |
 | **Date parsing** | ✅ Complete | Slovak month names → ISO, DD.MM.YYYY → ISO |
 | **PDF download + text extraction** | ✅ Complete | primary extraction via `pdfplumber` (truncated at 50 000 chars) with OCR fallback for scanned PDFs using `pypdfium2` + `tesseract` |
-| **Unit tests** | ✅ Complete | 341 backend (+ 1 skipped) + 135 frontend tests — `test_parser.py` (prices, dates), `test_integration.py` (scraper smoke), `test_models.py` (Phase 0, 24 tests), `test_migrate.py` (Phase 0, 15 tests), `test_engine.py` (Phase 1 + 6, 95 tests), `test_api.py` (Phase 2 + 6, 46 tests), `test_rules.py` (Phase 4, 37 tests), `test_chatbot.py` (Phase 5, 49 passed + 1 skipped), `test_workspace.py` (Phase 7, 5 tests), `test_export.py` (Phase 7, 5 tests), `test_url_state.py` (Phase 7, 5 tests), `test_e2e.py` (Phase 8, 15 tests), `test_performance.py` (Phase 8, 14 tests); 20 frontend test files (135 tests via vitest) including Phase 6 pages and Phase 7 WorkspaceToolbar. The skipped tests require `OPENAI_API_KEY` or a live Redis server — they are marked `@requires_openai_key` / `@requires_redis` and report SKIPPED when the service is absent. |
+| **Unit tests** | ✅ Complete | 349 backend (+ 1 skipped) + 192 frontend tests — `test_parser.py` (prices, dates), `test_integration.py` (scraper smoke), `test_models.py` (Phase 0, 24 tests), `test_migrate.py` (Phase 0, 15 tests), `test_engine.py` (Phase 1 + 6, 95 tests), `test_api.py` (Phase 2 + 6, 54 tests), `test_rules.py` (Phase 4, 37 tests), `test_chatbot.py` (Phase 5, 49 passed + 1 skipped), `test_workspace.py` (Phase 7, 5 tests), `test_export.py` (Phase 7, 5 tests), `test_url_state.py` (Phase 7, 5 tests), `test_e2e.py` (Phase 8, 15 tests), `test_performance.py` (Phase 8, 14 tests); 22 frontend test files (192 tests via vitest) including Phase 6 pages (BenchmarkView with 13 FilterBar integration tests) and Phase 7 WorkspaceToolbar. The skipped tests require `OPENAI_API_KEY` or a live Redis server — they are marked `@requires_openai_key` / `@requires_redis` and report SKIPPED when the service is absent. |
 | **Documentation** | ✅ Complete | README, ARCHITECTURE, QUICKSTART, START_HERE, PROJECT_COMPLETION, DELIVERY_SUMMARY, INDEX — all updated for Phase 0 and Phase 1 |
 | **Dependencies** | ✅ Pinned | `requirements.in` / `requirements.txt` — requests, beautifulsoup4, lxml, pdfplumber, pytest, pydantic>=2.0, python-dotenv, fastapi, uvicorn[standard], httpx, reportlab |
 | **Output format** | ✅ NDJSON | One JSON object per line; fields: listing, detail, PDF, `scraped_at`, `category`, `pdf_text_summary`, `award_type` |
@@ -528,6 +528,10 @@ Tests that require external services or API keys are decorated with conditional 
 | 6.7 | **Global Ranking Mode** — Backend: `GET /api/rankings` enhanced with metric selector (total spend, top-N concentration, fragmentation score, direct award rate) | ✅ DONE |
 | 6.8 | Global Ranking Mode — Frontend: `GlobalView` page: sortable ranking table; click-through to institution/vendor profiles | ✅ DONE |
 | 6.9 | All modes share the same `FilterBar` component and URL-state | ✅ DONE |
+| 6.10 | **Benchmark Mode** — Integrate shared `FilterBar` into `BenchmarkView` via `FilterContext`; global filters (date range, category, vendor, value range, award type, text search) persist across tab navigation and restrict benchmark API data | ✅ DONE |
+| 6.11 | **Benchmark Mode** — Backend: add `parse_filters` support to `/api/benchmark`, `/api/benchmark/peers`, and `/api/benchmark/compare` endpoints; engine methods (`compare`, `compare_multi_metric`, `peer_group`) accept optional `contracts` parameter for pre-filtered subsets | ✅ DONE |
+| 6.12 | **Benchmark Mode** — Frontend API: `fetchBenchmark`, `fetchBenchmarkPeers`, `fetchBenchmarkMultiMetric` now accept and forward `FilterState` to the backend | ✅ DONE |
+| 6.13 | **Benchmark Mode** — Filter-dependent institution selector: backend `institutions()` accepts optional `contracts` param, `/api/institutions` endpoint uses `parse_filters`, `fetchInstitutions` forwards `FilterState`, `BenchmarkView` re-fetches institution list on filter change and auto-deselects removed institutions | ✅ DONE |
 
 #### Unit Tests for Phase 6
 
@@ -540,9 +544,10 @@ Tests that require external services or API keys are decorated with conditional 
 | `test_engine.py::TestTrendMultiMetric` (3 tests) | Multi-metric trend generation | ✅ PASS |
 | `test_api.py::TestBenchmarkPeerGroup` (3 tests) | `/api/benchmark/peers` endpoint | ✅ PASS |
 | `test_api.py::TestBenchmarkMultiMetric` (2 tests) | `/api/benchmark/compare` endpoint | ✅ PASS |
+| `test_api.py::TestBenchmarkWithFilters` (8 tests) | `/api/benchmark`, `/api/benchmark/compare`, `/api/benchmark/peers` with global filters (date range, category, value range) | ✅ PASS |
 | `test_api.py::TestTrendsEnhanced` (3 tests) | Enhanced `/api/trends` with overlay dates and multi-metric | ✅ PASS |
 | `test_api.py::TestRankingsEnhanced` (5 tests) | Enhanced `/api/rankings` with filters and new metrics | ✅ PASS |
-| `BenchmarkView.test.tsx` (6 tests) | Renders institutions, peer suggestions, comparison charts, min-contracts filter | ✅ PASS |
+| `BenchmarkView.test.tsx` (15 tests) | Renders institutions, peer suggestions, comparison charts, min-contracts filter, FilterBar integration, filter state persistence, filters passed to API calls, filter-dependent institution list, auto-deselection on filter change | ✅ PASS |
 | `TimeView.test.tsx` (8 tests) | Loading/empty/chart states, granularity toggle, metric toggle, overlay toggle | ✅ PASS |
 | `GlobalView.test.tsx` (9 tests) | Loading/empty/table states, entity toggle, metric selector, rank rows, summary | ✅ PASS |
 | `App.test.tsx` (5 new tests) | Routes: /benchmark, /time, /rankings; navigation links | ✅ PASS |

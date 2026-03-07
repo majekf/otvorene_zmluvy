@@ -371,6 +371,7 @@ def get_treemap(
 @app.get("/api/benchmark")
 def get_benchmark(
     store: DataStore = Depends(get_store),
+    filters: FilterState = Depends(parse_filters),
     institutions: str = Query(
         ..., description="Pipe-separated institution names"
     ),
@@ -383,10 +384,24 @@ def get_benchmark(
 ):
     """Compare institutions side-by-side on a metric."""
     inst_list = [n.strip() for n in institutions.split("|")]
-    results = store.compare(inst_list, metric=metric)
+    # Pre-filter contracts by global filters (excluding institution filter,
+    # which is handled by the compare method itself)
+    base_filters = FilterState(
+        date_from=filters.date_from,
+        date_to=filters.date_to,
+        categories=filters.categories,
+        vendors=filters.vendors,
+        value_min=filters.value_min,
+        value_max=filters.value_max,
+        award_types=filters.award_types,
+        text_search=filters.text_search,
+    )
+    filtered = store.filter(base_filters)
+    results = store.compare(inst_list, metric=metric, contracts=filtered)
     if min_contracts is not None:
         # Post-filter: only include institutions meeting the threshold
-        inst_counts = {i.name: i.contract_count for i in store.institutions()}
+        from collections import Counter
+        inst_counts = Counter(c.buyer for c in filtered if c.buyer)
         results = [
             r for r in results
             if inst_counts.get(r["institution"], 0) >= min_contracts
@@ -400,6 +415,7 @@ def get_benchmark(
 @app.get("/api/benchmark/peers")
 def get_benchmark_peers(
     store: DataStore = Depends(get_store),
+    filters: FilterState = Depends(parse_filters),
     institution: str = Query(
         ..., description="Target institution name"
     ),
@@ -411,8 +427,21 @@ def get_benchmark_peers(
 
     Peers are institutions with at least ``min_contracts`` contracts,
     excluding the target institution itself.
+    When filters are active the peer list is computed from the filtered
+    contract subset.
     """
-    peers = store.peer_group(institution, min_contracts=min_contracts)
+    base_filters = FilterState(
+        date_from=filters.date_from,
+        date_to=filters.date_to,
+        categories=filters.categories,
+        vendors=filters.vendors,
+        value_min=filters.value_min,
+        value_max=filters.value_max,
+        award_types=filters.award_types,
+        text_search=filters.text_search,
+    )
+    filtered = store.filter(base_filters)
+    peers = store.peer_group(institution, min_contracts=min_contracts, contracts=filtered)
     return {
         "institution": institution,
         "min_contracts": min_contracts,
@@ -423,6 +452,7 @@ def get_benchmark_peers(
 @app.get("/api/benchmark/compare")
 def get_benchmark_compare(
     store: DataStore = Depends(get_store),
+    filters: FilterState = Depends(parse_filters),
     institutions: str = Query(
         ..., description="Pipe-separated institution names"
     ),
@@ -434,7 +464,18 @@ def get_benchmark_compare(
     """Compare institutions across multiple metrics simultaneously."""
     inst_list = [n.strip() for n in institutions.split("|")]
     metric_list = [m.strip() for m in metrics.split(",")]
-    results = store.compare_multi_metric(inst_list, metric_list)
+    base_filters = FilterState(
+        date_from=filters.date_from,
+        date_to=filters.date_to,
+        categories=filters.categories,
+        vendors=filters.vendors,
+        value_min=filters.value_min,
+        value_max=filters.value_max,
+        award_types=filters.award_types,
+        text_search=filters.text_search,
+    )
+    filtered = store.filter(base_filters)
+    results = store.compare_multi_metric(inst_list, metric_list, contracts=filtered)
     return {
         "metrics": metric_list,
         "results": results,
@@ -614,10 +655,19 @@ def _rank_vendors_from(
 
 
 @app.get("/api/institutions")
-def list_institutions(store: DataStore = Depends(get_store)):
-    """List of all unique institutions (buyers) with stats."""
+def list_institutions(
+    store: DataStore = Depends(get_store),
+    filters: FilterState = Depends(parse_filters),
+):
+    """List of all unique institutions (buyers) with stats.
+
+    Accepts optional global filters so downstream views (e.g. Benchmark
+    Mode) can restrict the institution list to those with contracts
+    matching the active filters.
+    """
+    filtered = store.filter(filters)
     return {
-        "institutions": [i.model_dump() for i in store.institutions()],
+        "institutions": [i.model_dump() for i in store.institutions(filtered)],
     }
 
 

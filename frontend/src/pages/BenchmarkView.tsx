@@ -4,6 +4,9 @@
  * Institution comparison mode: select 2–3 institutions and compare
  * them side-by-side on multiple metrics with bar charts.
  * Supports peer-group auto-discovery and min-contract threshold.
+ * Integrates the shared FilterBar so global filters (date range,
+ * category, vendor, value range, award type, text search) persist
+ * across tab navigation and restrict the benchmark dataset.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -21,6 +24,8 @@ import {
 import type { InstitutionSummary, BenchmarkMultiMetricResult } from '../types';
 import { fetchInstitutions, fetchBenchmarkMultiMetric, fetchBenchmarkPeers } from '../api';
 import { formatEur, formatCompact } from '../utils';
+import FilterBar from '../components/FilterBar';
+import { useFilterContext } from '../FilterContext';
 import WorkspaceToolbar from '../components/WorkspaceToolbar';
 import { ChartSkeleton } from '../components/LoadingSkeleton';
 
@@ -37,6 +42,7 @@ const BAR_COLORS = ['#2563eb', '#16a34a', '#f59e0b', '#ef4444'];
 
 export default function BenchmarkView() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { filters, setFilters, institutions: ctxInstitutions, categories, vendors, awardTypes } = useFilterContext();
 
   // Parse initial state from URL
   const urlInstitutions = searchParams.get('institutions')?.split('|').filter(Boolean) ?? [];
@@ -49,20 +55,41 @@ export default function BenchmarkView() {
   const [comparisonData, setComparisonData] = useState<BenchmarkMultiMetricResult[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Load institution list
-  useEffect(() => {
-    fetchInstitutions()
-      .then(({ institutions }) => setAllInstitutions(institutions))
-      .catch(() => {});
-  }, []);
+  // Build a "non-institution" filter object for benchmark API calls
+  // (institution selection is handled separately by the benchmark-specific picker)
+  const benchmarkFilters = useCallback(() => {
+    const { institutions: _inst, ...rest } = filters;
+    return rest;
+  }, [filters]);
 
-  // Sync state → URL
+  // Load institution list — re-fetch when global filters change so only
+  // institutions with contracts matching the active filters are shown.
+  useEffect(() => {
+    fetchInstitutions(filters)
+      .then(({ institutions }) => {
+        setAllInstitutions(institutions);
+        // Deselect institutions that no longer exist in the filtered set
+        const names = new Set(institutions.map((i) => i.name));
+        setSelected((prev) => prev.filter((n) => names.has(n)));
+      })
+      .catch(() => {});
+  }, [filters]);
+
+  // Sync state → URL (include global filter fields)
   useEffect(() => {
     const params = new URLSearchParams();
     if (selected.length) params.set('institutions', selected.join('|'));
     if (minContracts > 1) params.set('min_contracts', String(minContracts));
+    if (filters.date_from) params.set('date_from', filters.date_from);
+    if (filters.date_to) params.set('date_to', filters.date_to);
+    if (filters.categories?.length) params.set('categories', filters.categories.join('|'));
+    if (filters.vendors?.length) params.set('vendors', filters.vendors.join('|'));
+    if (filters.value_min !== undefined) params.set('value_min', String(filters.value_min));
+    if (filters.value_max !== undefined) params.set('value_max', String(filters.value_max));
+    if (filters.award_types?.length) params.set('award_types', filters.award_types.join('|'));
+    if (filters.text_search) params.set('text_search', filters.text_search);
     setSearchParams(params, { replace: true });
-  }, [selected, minContracts, setSearchParams]);
+  }, [selected, minContracts, filters, setSearchParams]);
 
   // Fetch peer group when first institution selected
   useEffect(() => {
@@ -70,10 +97,10 @@ export default function BenchmarkView() {
       setPeers([]);
       return;
     }
-    fetchBenchmarkPeers(selected[0], minContracts)
+    fetchBenchmarkPeers(selected[0], minContracts, benchmarkFilters())
       .then(({ peers: p }) => setPeers(p))
       .catch(() => setPeers([]));
-  }, [selected, minContracts]);
+  }, [selected, minContracts, benchmarkFilters]);
 
   // Fetch comparison data
   useEffect(() => {
@@ -82,11 +109,11 @@ export default function BenchmarkView() {
       return;
     }
     setLoading(true);
-    fetchBenchmarkMultiMetric(selected, METRICS.map((m) => m.id))
+    fetchBenchmarkMultiMetric(selected, METRICS.map((m) => m.id), benchmarkFilters())
       .then(({ results }) => setComparisonData(results))
       .catch(() => setComparisonData([]))
       .finally(() => setLoading(false));
-  }, [selected]);
+  }, [selected, benchmarkFilters]);
 
   const handleSelect = useCallback(
     (name: string) => {
@@ -95,6 +122,11 @@ export default function BenchmarkView() {
       );
     },
     [],
+  );
+
+  const handleFilterChange = useCallback(
+    (f: Parameters<typeof setFilters>[0]) => setFilters(f),
+    [setFilters],
   );
 
   // Build chart data for each metric
@@ -142,8 +174,17 @@ export default function BenchmarkView() {
       </div>
 
       <WorkspaceToolbar
-        filters={{ institutions: selected }}
+        filters={{ ...filters, institutions: selected }}
         mode="benchmark"
+      />
+
+      <FilterBar
+        filters={filters}
+        onChange={handleFilterChange}
+        institutions={ctxInstitutions}
+        categories={categories}
+        vendors={vendors}
+        awardTypes={awardTypes}
       />
 
       {/* Institution selection */}
