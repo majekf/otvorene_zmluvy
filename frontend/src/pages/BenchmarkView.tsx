@@ -16,7 +16,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
-  Legend,
   Cell,
 } from 'recharts';
 import type { InstitutionSummary, BenchmarkMultiMetricResult } from '../types';
