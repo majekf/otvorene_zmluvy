@@ -8,7 +8,7 @@
 
 import type { FilterState, SortSpec, GroupByField } from './types';
 
-export type AppMode = 'dashboard' | 'benchmark' | 'time' | 'rankings';
+export type AppMode = 'dashboard' | 'benchmark' | 'time' | 'rankings' | 'contracts';
 
 export interface UrlState {
   filters: FilterState;

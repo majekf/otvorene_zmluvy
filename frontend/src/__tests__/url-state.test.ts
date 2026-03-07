@@ -152,4 +152,11 @@ describe('Full state encode/decode (Phase 7)', () => {
     const decoded = parseUrlState(encoded);
     expect(decoded.mode).toBe('time');
   });
+
+  it('contracts mode survives round-trip', () => {
+    const original = { ...defaultUrlState(), mode: 'contracts' as const };
+    const encoded = encodeUrlState(original);
+    const decoded = parseUrlState(encoded);
+    expect(decoded.mode).toBe('contracts');
+  });
 });

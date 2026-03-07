@@ -21,7 +21,7 @@
 | **Price parsing** | ✅ Complete | Slovak format `28 978,27 €` → `28978.27` with NBSP handling |
 | **Date parsing** | ✅ Complete | Slovak month names → ISO, DD.MM.YYYY → ISO |
 | **PDF download + text extraction** | ✅ Complete | `pdfplumber`, truncated at 50 000 chars |
-| **Unit tests** | ✅ Complete | 341 backend (+ 1 skipped) + 135 frontend tests — `test_parser.py` (prices, dates), `test_integration.py` (scraper smoke), `test_models.py` (Phase 0, 24 tests), `test_migrate.py` (Phase 0, 15 tests), `test_engine.py` (Phase 1 + 6, 95 tests), `test_api.py` (Phase 2 + 6, 46 tests), `test_rules.py` (Phase 4, 37 tests), `test_chatbot.py` (Phase 5, 49 passed + 1 skipped), `test_workspace.py` (Phase 7, 5 tests), `test_export.py` (Phase 7, 5 tests), `test_url_state.py` (Phase 7, 5 tests), `test_e2e.py` (Phase 8, 15 tests), `test_performance.py` (Phase 8, 14 tests); 20 frontend test files (135 tests via vitest) including Phase 6 pages and Phase 7 WorkspaceToolbar. The skipped tests require `OPENAI_API_KEY` or a live Redis server — they are marked `@requires_openai_key` / `@requires_redis` and report SKIPPED when the service is absent. |
+| **Unit tests** | ✅ Complete | 341 backend (+ 1 skipped) + 159 frontend tests — `test_parser.py` (prices, dates), `test_integration.py` (scraper smoke), `test_models.py` (Phase 0, 24 tests), `test_migrate.py` (Phase 0, 15 tests), `test_engine.py` (Phase 1 + 6, 95 tests), `test_api.py` (Phase 2 + 6, 46 tests), `test_rules.py` (Phase 4, 37 tests), `test_chatbot.py` (Phase 5, 49 passed + 1 skipped), `test_workspace.py` (Phase 7, 5 tests), `test_export.py` (Phase 7, 5 tests), `test_url_state.py` (Phase 7, 5 tests), `test_e2e.py` (Phase 8, 15 tests), `test_performance.py` (Phase 8, 14 tests); 21 frontend test files (159 tests via vitest) including Phase 3 AllContracts page, Phase 6 pages and Phase 7 WorkspaceToolbar. The skipped tests require `OPENAI_API_KEY` or a live Redis server — they are marked `@requires_openai_key` / `@requires_redis` and report SKIPPED when the service is absent. |
 | **Documentation** | ✅ Complete | README, ARCHITECTURE, QUICKSTART, START_HERE, PROJECT_COMPLETION, DELIVERY_SUMMARY, INDEX — all updated for Phase 0 and Phase 1 |
 | **Dependencies** | ✅ Pinned | `requirements.in` / `requirements.txt` — requests, beautifulsoup4, lxml, pdfplumber, pytest, pydantic>=2.0, python-dotenv, fastapi, uvicorn[standard], httpx, reportlab |
 | **Output format** | ✅ NDJSON | One JSON object per line; fields: listing, detail, PDF, `scraped_at`, `category`, `pdf_text_summary`, `award_type` |
@@ -286,6 +286,7 @@ Full suite: 161 tests (42 Phase 2 + 80 Phase 1 + 39 Phase 0) — all passing.
 | 3.14 | Create `VendorProfile` page: institutions served, contract list, trend | ✅ DONE |
 | 3.15 | Ensure zero dead-ends: every contract/vendor/institution name is a clickable link | ✅ DONE |
 | 3.16 | Implement responsive design (desktop-first with usable mobile fallback) | ✅ DONE |
+| 3.17 | Create `AllContracts` page (`frontend/src/pages/AllContracts.tsx`) — minimalistic contracts browser: `FilterBar` + `WorkspaceToolbar` + `ContractsTable` + `Pagination`; no charts, no summary strip, no rule panel; all table features preserved (multi-column sort, clickable rows, severity badges, URL-state sync, export/share); route `/contracts`; `AppMode` extended with `'contracts'`; nav link "All contracts" added between Dashboard and Benchmark | ✅ DONE |
 
 #### Unit Tests for Phase 3
 
@@ -294,9 +295,10 @@ Full suite: 161 tests (42 Phase 2 + 80 Phase 1 + 39 Phase 0) — all passing.
 - `CategoryAccordion.test.tsx` — expand/collapse toggles; shows correct contract count
 - `ContractsTable.test.tsx` — renders rows; clicking row navigates to detail
 - `ContractDetail.test.tsx` — displays all fields; back button restores prior state
-- `url-state.test.ts` — encode → decode round-trip for all filter fields
+- `url-state.test.ts` — encode → decode round-trip for all filter fields; `'contracts'` mode round-trip
 - `InstitutionProfile.test.tsx` — renders stats and chart; handles missing data
 - `VendorProfile.test.tsx` — renders vendor details and contract list
+- `AllContracts.test.tsx` (16 tests) — page container, filter bar, loading skeleton, table rendering, contract rows, absent visualisation elements, pagination, empty/error states, API call on mount, sort resetting page to 1
 
 ##### ContractsTable — multi-column sort tests
 
@@ -622,7 +624,7 @@ Tests that require external services or API keys are decorated with conditional 
 - `test_performance.py::TestSortPerformance` (2 tests) — single/multi-column sort on 10k contracts
 - `test_performance.py::TestLoadPerformance` (2 tests) — load 10k <2s, 50k <10s
 - Frontend: `ErrorBoundary.tsx` and `LoadingSkeleton.tsx` components created; accessibility ARIA attributes added to 6 components
-- All 341 backend tests pass (+ 1 skipped), all 135 frontend tests pass
+- All 341 backend tests pass (+ 1 skipped), all 159 frontend tests pass
 
 #### Unlocks
 
