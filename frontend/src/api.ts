@@ -35,14 +35,14 @@ const API_URL = (import.meta.env.VITE_API_URL || '').trim();
 
 function filterParams(filters: FilterState): Record<string, string> {
   const p: Record<string, string> = {};
-  if (filters.institutions?.length) p.institutions = filters.institutions.join(',');
+  if (filters.institutions?.length) p.institutions = filters.institutions.join('|');
   if (filters.date_from) p.date_from = filters.date_from;
   if (filters.date_to) p.date_to = filters.date_to;
-  if (filters.categories?.length) p.categories = filters.categories.join(',');
-  if (filters.vendors?.length) p.vendors = filters.vendors.join(',');
+  if (filters.categories?.length) p.categories = filters.categories.join('|');
+  if (filters.vendors?.length) p.vendors = filters.vendors.join('|');
   if (filters.value_min !== undefined) p.value_min = String(filters.value_min);
   if (filters.value_max !== undefined) p.value_max = String(filters.value_max);
-  if (filters.award_types?.length) p.award_types = filters.award_types.join(',');
+  if (filters.award_types?.length) p.award_types = filters.award_types.join('|');
   if (filters.text_search) p.text_search = filters.text_search;
   return p;
 }
@@ -112,7 +112,7 @@ export async function fetchBenchmark(
   metric = 'total_spend',
   minContracts?: number,
 ): Promise<BenchmarkResponse> {
-  const p: Record<string, string> = { institutions: institutions.join(','), metric };
+  const p: Record<string, string> = { institutions: institutions.join('|'), metric };
   if (minContracts !== undefined) p.min_contracts = String(minContracts);
   return get<BenchmarkResponse>(`/api/benchmark${qs(p)}`);
 }
@@ -129,7 +129,7 @@ export async function fetchBenchmarkMultiMetric(
   institutions: string[],
   metrics: string[],
 ): Promise<BenchmarkMultiMetricResponse> {
-  const p = { institutions: institutions.join(','), metrics: metrics.join(',') };
+  const p = { institutions: institutions.join('|'), metrics: metrics.join(',') };
   return get<BenchmarkMultiMetricResponse>(`/api/benchmark/compare${qs(p)}`);
 }
 

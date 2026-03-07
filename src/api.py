@@ -114,7 +114,7 @@ def get_store() -> DataStore:
 
 def parse_filters(
     institutions: Optional[str] = Query(
-        None, description="Comma-separated buyer names"
+        None, description="Pipe-separated buyer names"
     ),
     date_from: Optional[str] = Query(
         None, description="Start date (YYYY-MM-DD)"
@@ -123,10 +123,10 @@ def parse_filters(
         None, description="End date (YYYY-MM-DD)"
     ),
     categories: Optional[str] = Query(
-        None, description="Comma-separated categories"
+        None, description="Pipe-separated categories"
     ),
     vendors: Optional[str] = Query(
-        None, description="Comma-separated supplier names"
+        None, description="Pipe-separated supplier names"
     ),
     value_min: Optional[float] = Query(
         None, description="Minimum EUR value"
@@ -135,7 +135,7 @@ def parse_filters(
         None, description="Maximum EUR value"
     ),
     award_types: Optional[str] = Query(
-        None, description="Comma-separated award types"
+        None, description="Pipe-separated award types"
     ),
     text_search: Optional[str] = Query(
         None, description="Full-text search query"
@@ -143,20 +143,20 @@ def parse_filters(
 ) -> FilterState:
     """Build a FilterState from query parameters.
 
-    List-type fields are passed as comma-separated strings.
+    List-type fields are passed as pipe-separated strings.
     """
     return FilterState(
         institutions=(
-            institutions.split(",") if institutions else None
+            institutions.split("|") if institutions else None
         ),
         date_from=date_from,
         date_to=date_to,
-        categories=categories.split(",") if categories else None,
-        vendors=vendors.split(",") if vendors else None,
+        categories=categories.split("|") if categories else None,
+        vendors=vendors.split("|") if vendors else None,
         value_min=value_min,
         value_max=value_max,
         award_types=(
-            award_types.split(",") if award_types else None
+            award_types.split("|") if award_types else None
         ),
         text_search=text_search,
     )
@@ -215,21 +215,21 @@ def encode_filter_state(
     """
     params: Dict[str, str] = {}
     if fs.institutions:
-        params["institutions"] = ",".join(fs.institutions)
+        params["institutions"] = "|".join(fs.institutions)
     if fs.date_from:
         params["date_from"] = fs.date_from
     if fs.date_to:
         params["date_to"] = fs.date_to
     if fs.categories:
-        params["categories"] = ",".join(fs.categories)
+        params["categories"] = "|".join(fs.categories)
     if fs.vendors:
-        params["vendors"] = ",".join(fs.vendors)
+        params["vendors"] = "|".join(fs.vendors)
     if fs.value_min is not None:
         params["value_min"] = str(fs.value_min)
     if fs.value_max is not None:
         params["value_max"] = str(fs.value_max)
     if fs.award_types:
-        params["award_types"] = ",".join(fs.award_types)
+        params["award_types"] = "|".join(fs.award_types)
     if fs.text_search:
         params["text_search"] = fs.text_search
     if sort_spec:
@@ -372,7 +372,7 @@ def get_treemap(
 def get_benchmark(
     store: DataStore = Depends(get_store),
     institutions: str = Query(
-        ..., description="Comma-separated institution names"
+        ..., description="Pipe-separated institution names"
     ),
     metric: str = Query(
         "total_spend", description="Comparison metric"
@@ -382,7 +382,7 @@ def get_benchmark(
     ),
 ):
     """Compare institutions side-by-side on a metric."""
-    inst_list = [n.strip() for n in institutions.split(",")]
+    inst_list = [n.strip() for n in institutions.split("|")]
     results = store.compare(inst_list, metric=metric)
     if min_contracts is not None:
         # Post-filter: only include institutions meeting the threshold
@@ -424,7 +424,7 @@ def get_benchmark_peers(
 def get_benchmark_compare(
     store: DataStore = Depends(get_store),
     institutions: str = Query(
-        ..., description="Comma-separated institution names"
+        ..., description="Pipe-separated institution names"
     ),
     metrics: str = Query(
         "total_spend",
@@ -432,7 +432,7 @@ def get_benchmark_compare(
     ),
 ):
     """Compare institutions across multiple metrics simultaneously."""
-    inst_list = [n.strip() for n in institutions.split(",")]
+    inst_list = [n.strip() for n in institutions.split("|")]
     metric_list = [m.strip() for m in metrics.split(",")]
     results = store.compare_multi_metric(inst_list, metric_list)
     return {

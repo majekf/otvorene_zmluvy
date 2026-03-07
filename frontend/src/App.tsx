@@ -4,6 +4,7 @@
 
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
+import AllContracts from './pages/AllContracts';
 import ContractDetail from './pages/ContractDetail';
 import InstitutionProfile from './pages/InstitutionProfile';
 import VendorProfile from './pages/VendorProfile';
@@ -85,6 +86,7 @@ function AppShell() {
               </Link>
               <nav className="hidden sm:flex items-center gap-1" data-testid="main-nav">
                 <NavLink to="/" label="Dashboard" />
+                <NavLink to="/contracts" label="All contracts" />
                 <NavLink to="/benchmark" label="Benchmark" />
                 <NavLink to="/time" label="Trends" />
                 <NavLink to="/rankings" label="Rankings" />
@@ -102,6 +104,7 @@ function AppShell() {
         <ErrorBoundary>
           <Routes>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/contracts" element={<AllContracts />} />
             <Route path="/contract/:id" element={<ContractDetail />} />
             <Route path="/institution/:id" element={<InstitutionProfile />} />
             <Route path="/vendor/:id" element={<VendorProfile />} />

@@ -14,7 +14,7 @@ export interface WorkspaceToolbarProps {
   filters: FilterState;
   /** Current sort spec for export column ordering. */
   sort?: SortSpec;
-  /** Current mode label (dashboard, benchmark, time, rankings). */
+  /** Current mode label (dashboard, contracts, benchmark, time, rankings). */
   mode?: string;
   /** Optional group-by for workspace snapshot. */
   groupBy?: string;

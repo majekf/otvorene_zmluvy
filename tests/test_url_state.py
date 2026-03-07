@@ -36,10 +36,10 @@ class TestUrlStateFull:
             page=3,
         )
 
-        assert encoded["institutions"] == "Mesto Bratislava,Mesto Košice"
+        assert encoded["institutions"] == "Mesto Bratislava|Mesto Košice"
         assert encoded["date_from"] == "2025-01-01"
         assert encoded["date_to"] == "2025-12-31"
-        assert encoded["categories"] == "construction,IT"
+        assert encoded["categories"] == "construction|IT"
         assert encoded["vendors"] == "STRABAG s.r.o."
         assert encoded["value_min"] == "10000.0"
         assert encoded["value_max"] == "500000.0"

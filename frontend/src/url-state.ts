@@ -8,7 +8,7 @@
 
 import type { FilterState, SortSpec, GroupByField } from './types';
 
-export type AppMode = 'dashboard' | 'benchmark' | 'time' | 'rankings';
+export type AppMode = 'dashboard' | 'benchmark' | 'time' | 'rankings' | 'contracts';
 
 export interface UrlState {
   filters: FilterState;
@@ -24,14 +24,14 @@ export function parseUrlState(search: string): UrlState {
   const p = new URLSearchParams(search);
 
   const filters: FilterState = {};
-  if (p.get('institutions')) filters.institutions = p.get('institutions')!.split(',');
+  if (p.get('institutions')) filters.institutions = p.get('institutions')!.split('|');
   if (p.get('date_from')) filters.date_from = p.get('date_from')!;
   if (p.get('date_to')) filters.date_to = p.get('date_to')!;
-  if (p.get('categories')) filters.categories = p.get('categories')!.split(',');
-  if (p.get('vendors')) filters.vendors = p.get('vendors')!.split(',');
+  if (p.get('categories')) filters.categories = p.get('categories')!.split('|');
+  if (p.get('vendors')) filters.vendors = p.get('vendors')!.split('|');
   if (p.get('value_min')) filters.value_min = Number(p.get('value_min'));
   if (p.get('value_max')) filters.value_max = Number(p.get('value_max'));
-  if (p.get('award_types')) filters.award_types = p.get('award_types')!.split(',');
+  if (p.get('award_types')) filters.award_types = p.get('award_types')!.split('|');
   if (p.get('text_search')) filters.text_search = p.get('text_search')!;
 
   const sort: SortSpec = [];
@@ -56,14 +56,14 @@ export function encodeUrlState(state: UrlState): string {
   const p = new URLSearchParams();
   const f = state.filters;
 
-  if (f.institutions?.length) p.set('institutions', f.institutions.join(','));
+  if (f.institutions?.length) p.set('institutions', f.institutions.join('|'));
   if (f.date_from) p.set('date_from', f.date_from);
   if (f.date_to) p.set('date_to', f.date_to);
-  if (f.categories?.length) p.set('categories', f.categories.join(','));
-  if (f.vendors?.length) p.set('vendors', f.vendors.join(','));
+  if (f.categories?.length) p.set('categories', f.categories.join('|'));
+  if (f.vendors?.length) p.set('vendors', f.vendors.join('|'));
   if (f.value_min !== undefined) p.set('value_min', String(f.value_min));
   if (f.value_max !== undefined) p.set('value_max', String(f.value_max));
-  if (f.award_types?.length) p.set('award_types', f.award_types.join(','));
+  if (f.award_types?.length) p.set('award_types', f.award_types.join('|'));
   if (f.text_search) p.set('text_search', f.text_search);
 
   if (state.sort.length) {

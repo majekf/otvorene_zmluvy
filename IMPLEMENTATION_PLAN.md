@@ -262,7 +262,7 @@ Full suite: 161 tests (42 Phase 2 + 80 Phase 1 + 39 Phase 0) — all passing.
 
 ### Phase 3 — Frontend: Institution Lens UI
 
-**Goal:** Build the default landing view with institution selector, dynamic aggregation panel, treemap visualization, expandable accordion rows, and contract detail — all with URL-state-driven navigation.
+**Goal:** Build the default landing view with institution selector, dynamic aggregation panel, treemap visualization, expandable accordion rows, and contract detail — all with URL-state-driven navigation. The Dashboard does not include a standalone flat contracts table; contract browsing is handled through `AccordionContracts` (inline per group) and the dedicated `AllContracts` page.
 
 **Dependencies:** Phase 2 (API endpoints).
 
@@ -286,6 +286,10 @@ Full suite: 161 tests (42 Phase 2 + 80 Phase 1 + 39 Phase 0) — all passing.
 | 3.14 | Create `VendorProfile` page: institutions served, contract list, trend | ✅ DONE |
 | 3.15 | Ensure zero dead-ends: every contract/vendor/institution name is a clickable link | ✅ DONE |
 | 3.16 | Implement responsive design (desktop-first with usable mobile fallback) | ✅ DONE |
+| 3.17 | Create `AllContracts` page (`frontend/src/pages/AllContracts.tsx`) — minimalistic contracts browser: `FilterBar` + `WorkspaceToolbar` + `ContractsTable` + `Pagination`; no charts, no summary strip, no rule panel; all table features preserved (multi-column sort, clickable rows, severity badges, URL-state sync, export/share); route `/contracts`; `AppMode` extended with `'contracts'`; nav link "All contracts" added between Dashboard and Benchmark | ✅ DONE |
+| 3.18 | Create `AccordionContracts` component (`frontend/src/components/AccordionContracts.tsx`) — lazy-loading contracts table rendered inside `CategoryAccordion` expanded rows; maps `groupBy` field to the correct filter key (`category→categories`, `supplier→vendors`, `buyer→institutions`, `award_type→award_types`, `month→date_from/date_to`); merges parent filters with group-specific filter; fetches via `fetchContracts`; includes own sort, pagination (page size 10), loading skeleton, error, and empty states; wired into `Dashboard.tsx` replacing the placeholder stub | ✅ DONE |
+| 3.19 | Fix comma-in-values bug — switch list-type filter delimiter from comma `,` to pipe `|` across the full stack: `frontend/src/api.ts` (`filterParams()`, `fetchBenchmark`, `fetchBenchmarkMultiMetric`), `frontend/src/url-state.ts` (`parseUrlState`, `encodeUrlState`), `frontend/src/pages/GlobalView.tsx`, `frontend/src/pages/TimeView.tsx`, `frontend/src/pages/BenchmarkView.tsx`, `src/api.py` (`parse_filters`, `encode_filter_state`, benchmark endpoints); sort and metric params stay comma-delimited since their values are internal identifiers; added round-trip tests for values containing commas in both frontend (`url-state.test.ts`) and backend (`test_api.py`) | ✅ DONE |
+| 3.20 | Remove redundant standalone `ContractsTable` + `Pagination` from `Dashboard.tsx` — contracts are already accessible via `AccordionContracts` inside each accordion row; removed associated `contracts` state, `contractSeverities` state, `handleSortChange`, `handleRowClick`, `handleFlagsChange` callbacks, `fetchContracts` call from Promise.all, and unused imports (`ContractsTable`, `Pagination`, `PaginatedContracts`, `fetchContracts`, `useNavigate`); `RulePanel` `onFlagsChange` prop omitted (optional); 184 frontend tests all pass | ✅ DONE |
 
 #### Unit Tests for Phase 3
 
@@ -294,9 +298,13 @@ Full suite: 161 tests (42 Phase 2 + 80 Phase 1 + 39 Phase 0) — all passing.
 - `CategoryAccordion.test.tsx` — expand/collapse toggles; shows correct contract count
 - `ContractsTable.test.tsx` — renders rows; clicking row navigates to detail
 - `ContractDetail.test.tsx` — displays all fields; back button restores prior state
-- `url-state.test.ts` — encode → decode round-trip for all filter fields
+- `url-state.test.ts` — encode → decode round-trip for all filter fields; `'contracts'` mode round-trip
 - `InstitutionProfile.test.tsx` — renders stats and chart; handles missing data
 - `VendorProfile.test.tsx` — renders vendor details and contract list
+- `AllContracts.test.tsx` (16 tests) — page container, filter bar, loading skeleton, table rendering, contract rows, absent visualisation elements, pagination, empty/error states, API call on mount, sort resetting page to 1
+- `AccordionContracts.test.tsx` (24 tests) — loading/empty/error states, contracts table rendering, pagination, group-to-filter mapping for all 5 groupBy fields (category/supplier/buyer/award_type/month), parent filter preservation, leap year date handling, immutability of base filters, sort reset, API call correctness
+
+**Total frontend test count: 184 tests passing across 22 test files (vitest)**
 
 ##### ContractsTable — multi-column sort tests
 
@@ -622,7 +630,7 @@ Tests that require external services or API keys are decorated with conditional 
 - `test_performance.py::TestSortPerformance` (2 tests) — single/multi-column sort on 10k contracts
 - `test_performance.py::TestLoadPerformance` (2 tests) — load 10k <2s, 50k <10s
 - Frontend: `ErrorBoundary.tsx` and `LoadingSkeleton.tsx` components created; accessibility ARIA attributes added to 6 components
-- All 341 backend tests pass (+ 1 skipped), all 135 frontend tests pass
+- All 341 backend tests pass (+ 1 skipped), all 184 frontend tests pass
 
 #### Unlocks
 
@@ -673,6 +681,24 @@ Phase 8: Polish & Deployment ← depends on ALL prior phases
 | 9th | **Phase 8** — Polish & Deploy | 2–3 days | ✅ **COMPLETE** | Final pass |
 
 **Total estimated effort: 24–35 working days | Completed: ~24–35 days (All phases complete)**
+
+---
+
+## 4 — CHANGELOG
+
+### 2026-03-07 — Test fix: benchmark separator mismatch
+
+**File changed:** `tests/test_e2e.py` — `TestFullWorkflow::test_benchmark_comparison`
+
+**Problem:** The test was building the `institutions` query parameter with a comma separator (`",".join(names)`), but the `/api/benchmark` endpoint splits on `|` (`institutions.split("|")`). This caused the two institution names to be treated as a single (non-existent) institution, returning 1 result instead of 2.
+
+Additionally, the test was pre-filtering institution names that contained commas (`[i for i in institutions if "," not in i["name"]]`), which was a workaround layered on top of the wrong separator and is no longer needed.
+
+**Fix applied:**
+- Changed `",".join(names)` → `"|".join(names)` to match the pipe-delimited API contract.
+- Removed the `safe_institutions` comma-filter workaround and its misleading comment.
+- Simplified the skip guard to check `len(institutions) < 2` (no longer tied to comma presence).
+- Updated inline comment from `# Compare (comma-separated institutions)` to `# API uses pipe-separated institution names`.
 
 ### 3.3 Risks and Potential Blockers
 

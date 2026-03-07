@@ -2,13 +2,13 @@
  * Dashboard Page (Home)
  *
  * Landing page showing overview: filter bar, treemap/bar chart,
- * accordion breakdown, contracts table, and pagination.
+ * and accordion breakdown with inline contract drill-down.
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import type { SortSpec, GroupByField, PaginatedContracts, AggregationsResponse, TreemapNode } from '../types';
-import { fetchContracts, fetchAggregations, fetchTreemap } from '../api';
+import { useSearchParams } from 'react-router-dom';
+import type { SortSpec, GroupByField, AggregationsResponse, TreemapNode } from '../types';
+import { fetchAggregations, fetchTreemap } from '../api';
 import { parseUrlState, encodeUrlState } from '../url-state';
 import { useFilterContext } from '../FilterContext';
 import FilterBar from '../components/FilterBar';
@@ -17,8 +17,7 @@ import WorkspaceToolbar from '../components/WorkspaceToolbar';
 import TreemapChart from '../components/TreemapChart';
 import BarChart from '../components/BarChart';
 import CategoryAccordion from '../components/CategoryAccordion';
-import ContractsTable from '../components/ContractsTable';
-import Pagination from '../components/Pagination';
+import AccordionContracts from '../components/AccordionContracts';
 import RulePanel from '../components/RulePanel';
 import ConditionBuilder from '../components/ConditionBuilder';
 import { formatEur } from '../utils';
@@ -28,26 +27,23 @@ type VizMode = 'treemap' | 'bar';
 
 export default function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
 
   // Parse URL state (for sort / groupBy / page only – filters come from context)
   const urlState = useMemo(() => parseUrlState(searchParams.toString()), [searchParams]);
 
   const { filters, setFilters, institutions: distinctInstitutions, categories: distinctCategories, vendors: distinctVendors, awardTypes: distinctAwardTypes } = useFilterContext();
-  const [sort, setSort] = useState<SortSpec>(urlState.sort);
+  const [sort] = useState<SortSpec>(urlState.sort);
   const [groupBy, setGroupBy] = useState<GroupByField>(urlState.groupBy);
-  const [page, setPage] = useState(urlState.page);
+  const [page] = useState(urlState.page);
   const [pageSize] = useState(urlState.pageSize);
   const [vizMode, setVizMode] = useState<VizMode>('treemap');
 
   // Data state
-  const [contracts, setContracts] = useState<PaginatedContracts | null>(null);
   const [aggregations, setAggregations] = useState<AggregationsResponse | null>(null);
   const [treemapData, setTreemapData] = useState<TreemapNode | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [showRules, setShowRules] = useState(false);
-  const [contractSeverities, setContractSeverities] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
 
   // Sync state → URL
@@ -56,19 +52,17 @@ export default function Dashboard() {
     setSearchParams(params, { replace: true });
   }, [filters, sort, groupBy, page, pageSize, setSearchParams]);
 
-  // Fetch data when filters / sort / page / groupBy change
+  // Fetch data when filters / groupBy change
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
 
     Promise.all([
-      fetchContracts(filters, page, pageSize, sort),
       fetchAggregations(filters, groupBy),
       fetchTreemap(filters, groupBy),
     ])
-      .then(([contractsRes, aggRes, treemapRes]) => {
+      .then(([aggRes, treemapRes]) => {
         if (cancelled) return;
-        setContracts(contractsRes);
         setAggregations(aggRes);
         setTreemapData(treemapRes);
         setError(null);
@@ -83,29 +77,11 @@ export default function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [filters, sort, page, pageSize, groupBy]);
+  }, [filters, groupBy]);
 
   const handleFilterChange = useCallback((newFilters: typeof filters) => {
     setFilters(newFilters);
-    setPage(1); // reset to page 1 on filter change
   }, [setFilters]);
-
-  const handleSortChange = useCallback((newSort: SortSpec) => {
-    setSort(newSort);
-    setPage(1); // reset to page 1 on sort change
-  }, []);
-
-  const handleRowClick = useCallback(
-    (contractId: string) => navigate(`/contract/${contractId}`),
-    [navigate],
-  );
-
-  const handleFlagsChange = useCallback(
-    (severities: Record<string, number>) => {
-      setContractSeverities(severities);
-    },
-    [],
-  );
 
   return (
     <div data-testid="dashboard" className="space-y-8 animate-fade-in">
@@ -179,30 +155,13 @@ export default function Dashboard() {
         <CategoryAccordion
           groups={aggregations.results}
           renderExpanded={(groupValue) => (
-            <div className="text-sm text-gray-600 px-4 pb-3">
-              {groupValue}
-            </div>
+            <AccordionContracts
+              filters={filters}
+              groupBy={groupBy}
+              groupValue={groupValue}
+            />
           )}
         />
-      )}
-
-      {/* Contracts table */}
-      {contracts && (
-        <>
-          <ContractsTable
-            contracts={contracts.contracts}
-            sort={sort}
-            onSortChange={handleSortChange}
-            onRowClick={handleRowClick}
-            contractSeverities={contractSeverities}
-          />
-          <Pagination
-            page={contracts.page}
-            pageSize={contracts.page_size}
-            total={contracts.total}
-            onPageChange={setPage}
-          />
-        </>
       )}
 
       {/* Rule Builder (Phase 4) */}
@@ -218,7 +177,7 @@ export default function Dashboard() {
         {showRules && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in">
             <div className="glass-card p-5">
-              <RulePanel filters={filters} onFlagsChange={handleFlagsChange} />
+              <RulePanel filters={filters} />
             </div>
             <div className="glass-card p-5">
               <ConditionBuilder filters={filters} />

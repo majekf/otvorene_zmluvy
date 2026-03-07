@@ -276,7 +276,7 @@ class TestBenchmark:
         r = client.get(
             "/api/benchmark",
             params={
-                "institutions": "Mesto Bratislava,Mesto Košice",
+                "institutions": "Mesto Bratislava|Mesto Košice",
                 "metric": "total_spend",
             },
         )
@@ -521,6 +521,21 @@ class TestFilterState:
         fs = FilterState()
         encoded = encode_filter_state(fs)
         assert encoded == {}
+
+    def test_values_with_commas_survive_round_trip(self, client):
+        """Values containing commas are preserved through encode→parse cycle."""
+        original = FilterState(
+            categories=["IT, consulting", "legal"],
+            vendors=["Smith, Jones & Co"],
+            institutions=["Ministry of Finance, SR"],
+        )
+        encoded = encode_filter_state(original)
+        r = client.get("/api/filter-state", params=encoded)
+        assert r.status_code == 200
+        parsed = r.json()["parsed"]
+        assert parsed["categories"] == ["IT, consulting", "legal"]
+        assert parsed["vendors"] == ["Smith, Jones & Co"]
+        assert parsed["institutions"] == ["Ministry of Finance, SR"]
 
 
 # ── Sample-data smoke tests ──────────────────────────────────────────
@@ -783,7 +798,7 @@ class TestBenchmarkPeerGroup:
         r = client.get(
             "/api/benchmark",
             params={
-                "institutions": "Mesto Bratislava,Mesto Košice,Ministerstvo vnútra SR",
+                "institutions": "Mesto Bratislava|Mesto Košice|Ministerstvo vnútra SR",
                 "metric": "total_spend",
                 "min_contracts": 2,
             },
@@ -803,7 +818,7 @@ class TestBenchmarkMultiMetric:
         r = client.get(
             "/api/benchmark/compare",
             params={
-                "institutions": "Mesto Bratislava,Mesto Košice",
+                "institutions": "Mesto Bratislava|Mesto Košice",
                 "metrics": "total_spend,contract_count,direct_award_rate",
             },
         )
