@@ -39,6 +39,7 @@ const COLUMNS: ColumnDef[] = [
         to={`/contract/${c.contract_id}`}
         className="text-primary-600 hover:text-primary-800 font-medium transition-colors"
         title={c.contract_title || ''}
+        onClick={(e) => e.stopPropagation()}
       >
         {c.contract_title || '—'}
       </Link>

@@ -121,6 +121,14 @@ describe('ContractsTable', () => {
     expect(onRowClick).not.toHaveBeenCalled();
   });
 
+  it('clicking title link does not trigger row navigation (prevents double history push)', () => {
+    const onRowClick = vi.fn();
+    renderTable([makeContract({ contract_id: 'c1', contract_title: 'Test Contract' })], [], vi.fn(), onRowClick);
+    const titleLink = screen.getByRole('link', { name: 'Test Contract' });
+    fireEvent.click(titleLink);
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
   it('vendor link points to vendor profile page', () => {
     renderTable([makeContract({ supplier: 'Vendor X' })]);
     const vendorLink = screen.getByRole('link', { name: 'Vendor X' });
