@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Dict, List, Optional
-from urllib.parse import urljoin, urlparse
+from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
 import pdfplumber
 import pypdfium2 as pdfium
@@ -219,6 +219,26 @@ def fetch_page(
     return None
 
 
+def build_listing_page_url(
+    listing_url: str,
+    page_index: int,
+    crz_filters: Optional[Dict[str, Optional[str]]] = None,
+) -> str:
+    """Build listing URL with page index and optional CRZ query filters."""
+    parsed = urlparse(listing_url)
+    query_map = dict(parse_qsl(parsed.query, keep_blank_values=True))
+
+    if crz_filters:
+        for key, value in crz_filters.items():
+            if value is None:
+                continue
+            query_map[key] = str(value)
+
+    query_map["page"] = str(page_index)
+    new_query = urlencode(query_map, doseq=True)
+    return urlunparse(parsed._replace(query=new_query))
+
+
 def extract_listing_rows(html: str) -> List[Dict[str, Any]]:
     """Extract contract rows from listing page HTML."""
     soup = BeautifulSoup(html, "html.parser")
@@ -370,6 +390,21 @@ def extract_contract_details(html: str, contract_url: str) -> Dict[str, Any]:
                         details["ico_supplier"] = value
                     elif last_entity == "rezort":
                         details["ico_rezort"] = value
+                elif "verejne obstaravanie" in label_norm:
+                    # Some contracts include an external procurement portal link
+                    # (for example UVO/Josephine). Keep both label and URL.
+                    link = li.find("a", href=True)
+                    if link:
+                        details["public_procurement_url"] = urljoin(
+                            BASE_URL,
+                            link["href"],
+                        )
+                        details["public_procurement_portal"] = link.get_text(
+                            " ",
+                            strip=True,
+                        )
+                    elif value:
+                        details["public_procurement_portal"] = value
 
             if identification_items:
                 details["identification_section_items"] = identification_items
@@ -407,6 +442,21 @@ def extract_contract_details(html: str, contract_url: str) -> Dict[str, Any]:
             if pdfs:
                 details["pdf_urls"] = pdfs
 
+        # Fallback: if the field exists outside expected section/card structure.
+        if "public_procurement_url" not in details:
+            for li in soup.find_all("li"):
+                strong = li.find("strong")
+                if not strong:
+                    continue
+                label_norm = normalize_text(strong.get_text(" ", strip=True))
+                if "verejne obstaravanie" not in label_norm:
+                    continue
+
+                link = li.find("a", href=True)
+                if link:
+                    details["public_procurement_url"] = urljoin(BASE_URL, link["href"])
+                    details["public_procurement_portal"] = link.get_text(" ", strip=True)
+                    break
     return details
 
 
@@ -414,6 +464,7 @@ def download_and_extract_pdf(
     pdf_url: str,
     pdf_dir: str,
     session: requests.Session,
+    agreement_context: Optional[str] = None,
     throttler: Optional[RequestThrottler] = None,
 ) -> Dict[str, Any]:
     """Download PDF and extract text."""
@@ -432,7 +483,10 @@ def download_and_extract_pdf(
         pdf_path = os.path.join(pdf_dir, filename)
         Path(pdf_dir).mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Downloading PDF: {pdf_url}")
+        if agreement_context:
+            logger.info("Downloading PDF for %s: %s", agreement_context, pdf_url)
+        else:
+            logger.info("Downloading PDF: %s", pdf_url)
         if throttler:
             throttler.wait_for_slot()
         response = session.get(pdf_url, timeout=DEFAULT_TIMEOUT)
@@ -650,6 +704,8 @@ def scrape_contracts(
     start_page: int = 1,
     max_pages: int = 1,
     max_contracts: Optional[int] = None,
+    listing_url: str = LISTING_URL,
+    crz_filters: Optional[Dict[str, Optional[str]]] = None,
     output_file: str = "out.json",
     delay: float = DEFAULT_DELAY,
     min_price: Optional[float] = None,
@@ -664,6 +720,8 @@ def scrape_contracts(
         start_page: Starting page number (1-indexed)
         max_pages: Maximum number of pages to scrape
         max_contracts: Optional hard limit on number of contracts to process
+        listing_url: Listing URL to scrape (default CRZ /zmluvy/ listing)
+        crz_filters: Optional CRZ server-side query filters, e.g. art_ico, art_predmet
         output_file: Output JSON file path
         delay: Delay between requests in seconds
         min_price: Minimum accepted contract value in EUR (inclusive)
@@ -694,7 +752,11 @@ def scrape_contracts(
             first_record = True
             for page_num in range(start_page, start_page + max_pages):
                 url_page = page_num - 1
-                page_url = f"{LISTING_URL}?page={url_page}"
+                page_url = build_listing_page_url(
+                    listing_url=listing_url,
+                    page_index=url_page,
+                    crz_filters=crz_filters,
+                )
 
                 logger.info(f"Fetching page {page_num} (URL page={url_page})")
                 html = fetch_page(page_url, session, throttler=throttler)
@@ -732,6 +794,17 @@ def scrape_contracts(
 
                     try:
                         contract_data = dict(row)
+                        agreement_context = (
+                            "row=%d page=%d contract_id=%s title=%s"
+                            % (
+                                contracts_processed + 1,
+                                page_num,
+                                row.get("contract_id") or "unknown",
+                                row.get("contract_title") or "unknown",
+                            )
+                        )
+                        logger.info("Processing agreement %s", agreement_context)
+
                         contract_data["scraped_at"] = (
                             datetime.now(timezone.utc)
                             .isoformat()
@@ -763,6 +836,7 @@ def scrape_contracts(
                                         pdf_url,
                                         pdf_dir,
                                         session,
+                                        agreement_context=agreement_context,
                                         throttler=throttler,
                                     )
 
