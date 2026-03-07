@@ -47,6 +47,23 @@ def main() -> int:
     parser.add_argument("--pdf-dir", type=str, default="data/pdfs")
     parser.add_argument("--log-level", type=str, default="INFO")
 
+    # CRZ server-side filters (forwarded to scrape_crz.py)
+    parser.add_argument("--crz-listing-url", type=str, default=None)
+    parser.add_argument("--crz-art-zs2", type=str, default=None)
+    parser.add_argument("--crz-art-predmet", type=str, default=None)
+    parser.add_argument("--crz-art-ico", type=str, default=None)
+    parser.add_argument("--crz-art-suma-spolu-od", type=str, default=None)
+    parser.add_argument("--crz-art-suma-spolu-do", type=str, default=None)
+    parser.add_argument("--crz-art-datum-zverejnene-od", type=str, default=None)
+    parser.add_argument("--crz-art-datum-zverejnene-do", type=str, default=None)
+    parser.add_argument("--crz-art-rezort", type=str, default=None)
+    parser.add_argument("--crz-art-zs1", type=str, default=None)
+    parser.add_argument("--crz-nazov", type=str, default=None)
+    parser.add_argument("--crz-art-ico1", type=str, default=None)
+    parser.add_argument("--crz-odoslat", type=str, default=None)
+    parser.add_argument("--crz-id", type=str, default=None)
+    parser.add_argument("--crz-frm-id-frm-filter-3", type=str, default=None)
+
     # Pipeline paths
     parser.add_argument(
         "--scrape-out",
@@ -109,6 +126,28 @@ def main() -> int:
         scrape_cmd.extend(["--user-agent", args.user_agent])
     if args.max_contracts is not None:
         scrape_cmd.extend(["--max-contracts", str(args.max_contracts)])
+    if args.crz_listing_url:
+        scrape_cmd.extend(["--crz-listing-url", args.crz_listing_url])
+
+    crz_filter_args = {
+        "--crz-art-zs2": args.crz_art_zs2,
+        "--crz-art-predmet": args.crz_art_predmet,
+        "--crz-art-ico": args.crz_art_ico,
+        "--crz-art-suma-spolu-od": args.crz_art_suma_spolu_od,
+        "--crz-art-suma-spolu-do": args.crz_art_suma_spolu_do,
+        "--crz-art-datum-zverejnene-od": args.crz_art_datum_zverejnene_od,
+        "--crz-art-datum-zverejnene-do": args.crz_art_datum_zverejnene_do,
+        "--crz-art-rezort": args.crz_art_rezort,
+        "--crz-art-zs1": args.crz_art_zs1,
+        "--crz-nazov": args.crz_nazov,
+        "--crz-art-ico1": args.crz_art_ico1,
+        "--crz-odoslat": args.crz_odoslat,
+        "--crz-id": args.crz_id,
+        "--crz-frm-id-frm-filter-3": args.crz_frm_id_frm_filter_3,
+    }
+    for flag, value in crz_filter_args.items():
+        if value is not None:
+            scrape_cmd.extend([flag, value])
 
     # Step 2: migrate
     migrate_cmd = [
