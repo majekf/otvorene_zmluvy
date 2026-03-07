@@ -16,11 +16,11 @@
 
 | Component | Status | Details |
 |-----------|--------|---------|
-| **Ingestion / Scraper** | ✅ Complete | `src/scraper.py` (454 LOC) — paginates `crz.gov.sk`, extracts listing rows, fetches detail pages, downloads PDFs, extracts text via `pdfplumber`, outputs NDJSON |
-| **CLI entry point** | ✅ Complete | `scrape_crz.py` — argparse with `--start-page`, `--max-pages`, `--out`, `--delay`, `--user-agent`, `--pdf-dir`, `--log-level` |
+| **Ingestion / Scraper** | ✅ Complete | `src/scraper.py` — paginates `crz.gov.sk`, extracts listing rows, fetches detail pages, downloads PDFs, extracts text via `pdfplumber`, and automatically uses OCR fallback (`tesseract`) when PDFs are scanned/non-selectable |
+| **CLI entry point** | ✅ Complete | `scrape_crz.py` — argparse with scrape flags plus OCR JSON backfill mode: `--ocr-json`, `--ocr-out`, `--ocr-min-chars`, `--ocr-lang` |
 | **Price parsing** | ✅ Complete | Slovak format `28 978,27 €` → `28978.27` with NBSP handling |
 | **Date parsing** | ✅ Complete | Slovak month names → ISO, DD.MM.YYYY → ISO |
-| **PDF download + text extraction** | ✅ Complete | `pdfplumber`, truncated at 50 000 chars |
+| **PDF download + text extraction** | ✅ Complete | primary extraction via `pdfplumber` (truncated at 50 000 chars) with OCR fallback for scanned PDFs using `pypdfium2` + `tesseract` |
 | **Unit tests** | ✅ Complete | 341 backend (+ 1 skipped) + 135 frontend tests — `test_parser.py` (prices, dates), `test_integration.py` (scraper smoke), `test_models.py` (Phase 0, 24 tests), `test_migrate.py` (Phase 0, 15 tests), `test_engine.py` (Phase 1 + 6, 95 tests), `test_api.py` (Phase 2 + 6, 46 tests), `test_rules.py` (Phase 4, 37 tests), `test_chatbot.py` (Phase 5, 49 passed + 1 skipped), `test_workspace.py` (Phase 7, 5 tests), `test_export.py` (Phase 7, 5 tests), `test_url_state.py` (Phase 7, 5 tests), `test_e2e.py` (Phase 8, 15 tests), `test_performance.py` (Phase 8, 14 tests); 20 frontend test files (135 tests via vitest) including Phase 6 pages and Phase 7 WorkspaceToolbar. The skipped tests require `OPENAI_API_KEY` or a live Redis server — they are marked `@requires_openai_key` / `@requires_redis` and report SKIPPED when the service is absent. |
 | **Documentation** | ✅ Complete | README, ARCHITECTURE, QUICKSTART, START_HERE, PROJECT_COMPLETION, DELIVERY_SUMMARY, INDEX — all updated for Phase 0 and Phase 1 |
 | **Dependencies** | ✅ Pinned | `requirements.in` / `requirements.txt` — requests, beautifulsoup4, lxml, pdfplumber, pytest, pydantic>=2.0, python-dotenv, fastapi, uvicorn[standard], httpx, reportlab |

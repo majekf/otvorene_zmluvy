@@ -11,14 +11,18 @@ Scrapes contract data from https://www.crz.gov.sk/ with:
 import logging
 import os
 import re
+import shutil
+import subprocess
 import time
 import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin, urlparse
 
 import pdfplumber
+import pypdfium2 as pdfium
 import requests
 from bs4 import BeautifulSoup
 
@@ -451,13 +455,195 @@ def download_and_extract_pdf(
                 result["pdf_text"] = full_text[:50000] if full_text else None
 
                 logger.info(f"Extracted {len(full_text)} chars from PDF")
+
+                if not _is_readable_text(result["pdf_text"]):
+                    logger.info(
+                        "Text extraction returned too little text, trying OCR fallback"
+                    )
+                    ocr_text = extract_text_with_ocr(pdf_path)
+                    if ocr_text:
+                        result["pdf_text"] = ocr_text[:50000]
+                        logger.info(
+                            "OCR fallback extracted %d chars", len(result["pdf_text"])
+                        )
         except Exception as e:
             logger.warning(f"Failed to extract text from PDF {pdf_path}: {e}")
+            ocr_text = extract_text_with_ocr(pdf_path)
+            if ocr_text:
+                result["pdf_text"] = ocr_text[:50000]
+                logger.info(
+                    "OCR fallback extracted %d chars after pdfplumber failure",
+                    len(result["pdf_text"]),
+                )
 
     except Exception as e:
         logger.error(f"Failed to download/process PDF {pdf_url}: {e}")
 
     return result
+
+
+def _is_readable_text(text: Optional[str], min_chars: int = 30) -> bool:
+    """Heuristic: treat text as readable only if it has enough non-space chars."""
+    if not text:
+        return False
+    return len("".join(text.split())) >= min_chars
+
+
+def extract_text_with_ocr(
+    pdf_path: str,
+    max_chars: int = 50000,
+    lang: str = "slk+eng",
+    dpi: int = 220,
+) -> Optional[str]:
+    """
+    OCR text extraction fallback for scanned PDFs.
+
+    Requires `tesseract` binary available in PATH.
+    """
+    if not shutil.which("tesseract"):
+        logger.warning("OCR fallback skipped: 'tesseract' binary not found in PATH")
+        return None
+
+    try:
+        pdf = pdfium.PdfDocument(pdf_path)
+    except Exception as e:
+        logger.warning("OCR fallback failed to open PDF %s: %s", pdf_path, e)
+        return None
+
+    try:
+        text_parts: List[str] = []
+        with TemporaryDirectory(prefix="crz_ocr_") as temp_dir:
+            total_pages = len(pdf)
+            for page_index in range(total_pages):
+                try:
+                    page = pdf[page_index]
+                    bitmap = page.render(scale=dpi / 72)
+                    pil_image = bitmap.to_pil()
+
+                    image_path = Path(temp_dir) / f"page_{page_index + 1:04d}.png"
+                    pil_image.save(image_path, format="PNG")
+
+                    cmd = [
+                        "tesseract",
+                        str(image_path),
+                        "stdout",
+                        "-l",
+                        lang,
+                        "--dpi",
+                        str(dpi),
+                    ]
+                    proc = subprocess.run(
+                        cmd,
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+
+                    if proc.returncode != 0:
+                        logger.warning(
+                            "OCR failed on %s page %d: %s",
+                            pdf_path,
+                            page_index + 1,
+                            proc.stderr.strip() or "unknown tesseract error",
+                        )
+                        continue
+
+                    page_text = proc.stdout.strip()
+                    if page_text:
+                        text_parts.append(page_text)
+
+                    joined = "\n".join(text_parts)
+                    if len(joined) >= max_chars:
+                        return joined[:max_chars]
+
+                except Exception as page_error:
+                    logger.warning(
+                        "OCR page render/process failed for %s page %d: %s",
+                        pdf_path,
+                        page_index + 1,
+                        page_error,
+                    )
+                    continue
+
+        full_text = "\n".join(text_parts).strip()
+        return full_text[:max_chars] if full_text else None
+    finally:
+        pdf.close()
+
+
+def enrich_json_with_ocr_text(
+    input_json_path: str,
+    output_json_path: Optional[str] = None,
+    min_chars: int = 30,
+    lang: str = "slk+eng",
+) -> Dict[str, int]:
+    """
+    Fill missing/unreadable `pdf_text` in contracts JSON using OCR.
+
+    Processes records where `pdf_local_path` exists and current `pdf_text` is empty
+    or shorter than `min_chars` non-space characters.
+    """
+    import json
+
+    in_path = Path(input_json_path)
+    out_path = Path(output_json_path) if output_json_path else in_path
+
+    if not in_path.exists():
+        raise FileNotFoundError(f"Input JSON not found: {in_path}")
+
+    records = json.loads(in_path.read_text(encoding="utf-8"))
+    if not isinstance(records, list):
+        raise ValueError("Input JSON must contain a top-level list of contracts")
+
+    updated = 0
+    skipped = 0
+
+    for record in records:
+        if not isinstance(record, dict):
+            skipped += 1
+            continue
+
+        current_text = record.get("pdf_text")
+        if _is_readable_text(current_text, min_chars=min_chars):
+            skipped += 1
+            continue
+
+        local_path = record.get("pdf_local_path")
+        if not local_path:
+            skipped += 1
+            continue
+
+        pdf_path = Path(local_path)
+        if not pdf_path.is_absolute():
+            # Prefer path relative to current working directory, then to JSON file.
+            cwd_path = Path.cwd() / pdf_path
+            json_relative_path = in_path.parent / pdf_path
+            if cwd_path.exists():
+                pdf_path = cwd_path
+            else:
+                pdf_path = json_relative_path
+
+        if not pdf_path.exists():
+            skipped += 1
+            continue
+
+        ocr_text = extract_text_with_ocr(str(pdf_path), lang=lang)
+        if ocr_text:
+            record["pdf_text"] = ocr_text
+            updated += 1
+        else:
+            skipped += 1
+
+    out_path.write_text(
+        json.dumps(records, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    return {
+        "total": len(records),
+        "updated": updated,
+        "skipped": skipped,
+    }
 
 
 def scrape_contracts(

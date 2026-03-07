@@ -15,7 +15,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from scraper import scrape_contracts
+from scraper import enrich_json_with_ocr_text, scrape_contracts
 
 
 def main():
@@ -92,6 +92,34 @@ Examples:
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="Logging level (default: INFO)"
     )
+
+    parser.add_argument(
+        "--ocr-json",
+        type=str,
+        default=None,
+        help="Path to existing contracts JSON to enrich missing/unreadable pdf_text using OCR"
+    )
+
+    parser.add_argument(
+        "--ocr-out",
+        type=str,
+        default=None,
+        help="Output JSON path for OCR enrichment (default: overwrite --ocr-json file)"
+    )
+
+    parser.add_argument(
+        "--ocr-min-chars",
+        type=int,
+        default=30,
+        help="Minimum non-space chars required to consider pdf_text readable (default: 30)"
+    )
+
+    parser.add_argument(
+        "--ocr-lang",
+        type=str,
+        default="slk+eng",
+        help="Tesseract OCR language(s), e.g. 'slk+eng' (default: slk+eng)"
+    )
     
     args = parser.parse_args()
     
@@ -110,8 +138,26 @@ Examples:
     logger.info(f"  Min price: {args.min_price}")
     logger.info(f"  Max price: {args.max_price}")
     logger.info(f"  PDF dir: {args.pdf_dir}")
+    logger.info(f"  OCR JSON mode: {bool(args.ocr_json)}")
     
     try:
+        if args.ocr_json:
+            stats = enrich_json_with_ocr_text(
+                input_json_path=args.ocr_json,
+                output_json_path=args.ocr_out,
+                min_chars=args.ocr_min_chars,
+                lang=args.ocr_lang,
+            )
+            output_target = args.ocr_out or args.ocr_json
+            logger.info(
+                "OCR JSON enrichment complete: total=%d, updated=%d, skipped=%d, output=%s",
+                stats["total"],
+                stats["updated"],
+                stats["skipped"],
+                output_target,
+            )
+            return 0
+
         contracts_count = scrape_contracts(
             start_page=args.start_page,
             max_pages=args.max_pages,
