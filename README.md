@@ -541,7 +541,7 @@ For issues, questions, or suggestions:
 
 ## Changelog
 
-### v1.9.0 — Phase 8: Polish, Integration Testing, and Deployment (2026-03-06)
+### v1.9.0 — Phase 8: Polish, Integration Testing, and Deployment 
 - **E2E Tests**: 15 end-to-end integration tests (`tests/test_e2e.py`) covering full workflows, chatbot, and rule engine
 - **Performance Tests**: 14 performance benchmarks (`tests/test_performance.py`) validating sub-second query times on 10k–50k synthetic contracts
 - **Error Boundary**: `ErrorBoundary.tsx` React component wrapping all routes with retry button and expandable error details
@@ -551,7 +551,7 @@ For issues, questions, or suggestions:
 - **Dev Scripts**: `Makefile` with 12 targets (install, dev, test, lint, build, docker, clean); `scripts/start_dev.sh` (Bash) and `scripts/start_dev.ps1` (PowerShell)
 - **CI Pipeline**: `.github/workflows/ci.yml` with 4 jobs: backend-tests (Python 3.11+3.12 matrix), frontend-tests, frontend-lint, frontend-build
 
-### v1.8.0 — Phase 7: State, Sharing, and Export (2026-03-06)
+### v1.8.0 — Phase 7: State, Sharing, and Export 
 - `GET /api/export/pdf` — ReportLab-generated PDF report with title, summary stats, timestamp, and contract table (up to 500 rows)
 - `POST /api/workspace/save` — snapshot filters, sort, groupBy, page, mode, chart state, and chat history → base64 token + JSON
 - `GET /api/workspace/load?token=...` — restore workspace from base64-encoded snapshot
@@ -566,7 +566,7 @@ For issues, questions, or suggestions:
 - 8 new frontend tests: `WorkspaceToolbar.test.tsx` (5), `url-state.test.ts` (3 new)
 - Total: 312 backend tests (+ 1 skipped), 135 frontend tests
 
-### v1.4.0 — Phase 3: Frontend: Institution Lens UI (2026-03-03)
+### v1.4.0 — Phase 3: Frontend: Institution Lens UI 
 - React 18 + TypeScript + Vite frontend in `frontend/`
 - Tailwind CSS v4 via `@tailwindcss/vite` plugin
 - react-router-dom for client-side routing with URL-state
@@ -583,7 +583,7 @@ For issues, questions, or suggestions:
 - Vite proxy `/api` → `localhost:8000` for development
 - 71 unit tests across 13 test files (vitest + @testing-library/react)
 
-### v1.3.0 — Phase 2: Backend API (FastAPI) (2026-03-03)
+### v1.3.0 — Phase 2: Backend API (FastAPI) 
 - FastAPI application in `src/api.py` with 14 REST endpoints
 - `src/config.py` for environment-variable-based configuration
 - CORS middleware for frontend dev server
@@ -596,7 +596,7 @@ For issues, questions, or suggestions:
 - Added `fastapi`, `uvicorn[standard]`, `httpx` to dependencies
 - 33 new unit tests in `tests/test_api.py`
 
-### v1.2.0 — Phase 1: In-Memory Query & Aggregation Engine (2026-03-03)
+### v1.2.0 — Phase 1: In-Memory Query & Aggregation Engine 
 - `DataStore` class in `src/engine.py` — loads JSON, holds Contract objects in RAM
 - Shared global filters: institution(s), date range, category, vendor, value range, award type, text search
 - `group_by(field)` for category, supplier, buyer, month, award_type
@@ -609,7 +609,7 @@ For issues, questions, or suggestions:
 - `sort_contracts(contracts, sort_spec)` — multi-column sort with `SORTABLE_FIELDS` whitelist; `None` values always last regardless of direction
 - 80 unit tests in `tests/test_engine.py` (11 new `TestSort` tests added)
 
-### v1.1.0 — Phase 0: GovLens Data Foundation (2026-03-03)
+### v1.1.0 — Phase 0: GovLens Data Foundation 
 - Pydantic v2 data models (`Contract`, `Institution`, `Vendor`, `FilterState`, `AggregationResult`)
 - Three new enrichment fields on every contract: `category`, `pdf_text_summary`, `award_type`
 - NDJSON → JSON migration script (`scripts/migrate_ndjson.py`)
@@ -618,7 +618,7 @@ For issues, questions, or suggestions:
 - Updated `requirements.in` with `pydantic` and `python-dotenv`
 - 39 new unit tests across `test_models.py` and `test_migrate.py`
 
-### v1.0.0 (2026-03-01)
+### v1.0.0 
 - Initial release
 - Contract listing pagination
 - Contract detail extraction
