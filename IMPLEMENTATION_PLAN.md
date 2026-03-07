@@ -21,7 +21,7 @@
 | **Price parsing** | ✅ Complete | Slovak format `28 978,27 €` → `28978.27` with NBSP handling |
 | **Date parsing** | ✅ Complete | Slovak month names → ISO, DD.MM.YYYY → ISO |
 | **PDF download + text extraction** | ✅ Complete | `pdfplumber`, truncated at 50 000 chars |
-| **Unit tests** | ✅ Complete | 341 backend (+ 1 skipped) + 183 frontend tests — `test_parser.py` (prices, dates), `test_integration.py` (scraper smoke), `test_models.py` (Phase 0, 24 tests), `test_migrate.py` (Phase 0, 15 tests), `test_engine.py` (Phase 1 + 6, 95 tests), `test_api.py` (Phase 2 + 6, 46 tests), `test_rules.py` (Phase 4, 37 tests), `test_chatbot.py` (Phase 5, 49 passed + 1 skipped), `test_workspace.py` (Phase 7, 5 tests), `test_export.py` (Phase 7, 5 tests), `test_url_state.py` (Phase 7, 5 tests), `test_e2e.py` (Phase 8, 15 tests), `test_performance.py` (Phase 8, 14 tests); 22 frontend test files (183 tests via vitest) including Phase 3 AllContracts + AccordionContracts, Phase 6 pages and Phase 7 WorkspaceToolbar. The skipped tests require `OPENAI_API_KEY` or a live Redis server — they are marked `@requires_openai_key` / `@requires_redis` and report SKIPPED when the service is absent. |
+| **Unit tests** | ✅ Complete | 341 backend (+ 1 skipped) + 184 frontend tests — `test_parser.py` (prices, dates), `test_integration.py` (scraper smoke), `test_models.py` (Phase 0, 24 tests), `test_migrate.py` (Phase 0, 15 tests), `test_engine.py` (Phase 1 + 6, 95 tests), `test_api.py` (Phase 2 + 6, 46 tests), `test_rules.py` (Phase 4, 37 tests), `test_chatbot.py` (Phase 5, 49 passed + 1 skipped), `test_workspace.py` (Phase 7, 5 tests), `test_export.py` (Phase 7, 5 tests), `test_url_state.py` (Phase 7, 5 tests), `test_e2e.py` (Phase 8, 15 tests), `test_performance.py` (Phase 8, 14 tests); 22 frontend test files (184 tests via vitest) including Phase 3 AllContracts + AccordionContracts, Phase 6 pages and Phase 7 WorkspaceToolbar. The skipped tests require `OPENAI_API_KEY` or a live Redis server — they are marked `@requires_openai_key` / `@requires_redis` and report SKIPPED when the service is absent. |
 | **Documentation** | ✅ Complete | README, ARCHITECTURE, QUICKSTART, START_HERE, PROJECT_COMPLETION, DELIVERY_SUMMARY, INDEX — all updated for Phase 0 and Phase 1 |
 | **Dependencies** | ✅ Pinned | `requirements.in` / `requirements.txt` — requests, beautifulsoup4, lxml, pdfplumber, pytest, pydantic>=2.0, python-dotenv, fastapi, uvicorn[standard], httpx, reportlab |
 | **Output format** | ✅ NDJSON | One JSON object per line; fields: listing, detail, PDF, `scraped_at`, `category`, `pdf_text_summary`, `award_type` |
@@ -262,7 +262,7 @@ Full suite: 161 tests (42 Phase 2 + 80 Phase 1 + 39 Phase 0) — all passing.
 
 ### Phase 3 — Frontend: Institution Lens UI
 
-**Goal:** Build the default landing view with institution selector, dynamic aggregation panel, treemap visualization, expandable accordion rows, and contract detail — all with URL-state-driven navigation.
+**Goal:** Build the default landing view with institution selector, dynamic aggregation panel, treemap visualization, expandable accordion rows, and contract detail — all with URL-state-driven navigation. The Dashboard does not include a standalone flat contracts table; contract browsing is handled through `AccordionContracts` (inline per group) and the dedicated `AllContracts` page.
 
 **Dependencies:** Phase 2 (API endpoints).
 
@@ -289,6 +289,7 @@ Full suite: 161 tests (42 Phase 2 + 80 Phase 1 + 39 Phase 0) — all passing.
 | 3.17 | Create `AllContracts` page (`frontend/src/pages/AllContracts.tsx`) — minimalistic contracts browser: `FilterBar` + `WorkspaceToolbar` + `ContractsTable` + `Pagination`; no charts, no summary strip, no rule panel; all table features preserved (multi-column sort, clickable rows, severity badges, URL-state sync, export/share); route `/contracts`; `AppMode` extended with `'contracts'`; nav link "All contracts" added between Dashboard and Benchmark | ✅ DONE |
 | 3.18 | Create `AccordionContracts` component (`frontend/src/components/AccordionContracts.tsx`) — lazy-loading contracts table rendered inside `CategoryAccordion` expanded rows; maps `groupBy` field to the correct filter key (`category→categories`, `supplier→vendors`, `buyer→institutions`, `award_type→award_types`, `month→date_from/date_to`); merges parent filters with group-specific filter; fetches via `fetchContracts`; includes own sort, pagination (page size 10), loading skeleton, error, and empty states; wired into `Dashboard.tsx` replacing the placeholder stub | ✅ DONE |
 | 3.19 | Fix comma-in-values bug — switch list-type filter delimiter from comma `,` to pipe `|` across the full stack: `frontend/src/api.ts` (`filterParams()`, `fetchBenchmark`, `fetchBenchmarkMultiMetric`), `frontend/src/url-state.ts` (`parseUrlState`, `encodeUrlState`), `frontend/src/pages/GlobalView.tsx`, `frontend/src/pages/TimeView.tsx`, `frontend/src/pages/BenchmarkView.tsx`, `src/api.py` (`parse_filters`, `encode_filter_state`, benchmark endpoints); sort and metric params stay comma-delimited since their values are internal identifiers; added round-trip tests for values containing commas in both frontend (`url-state.test.ts`) and backend (`test_api.py`) | ✅ DONE |
+| 3.20 | Remove redundant standalone `ContractsTable` + `Pagination` from `Dashboard.tsx` — contracts are already accessible via `AccordionContracts` inside each accordion row; removed associated `contracts` state, `contractSeverities` state, `handleSortChange`, `handleRowClick`, `handleFlagsChange` callbacks, `fetchContracts` call from Promise.all, and unused imports (`ContractsTable`, `Pagination`, `PaginatedContracts`, `fetchContracts`, `useNavigate`); `RulePanel` `onFlagsChange` prop omitted (optional); 184 frontend tests all pass | ✅ DONE |
 
 #### Unit Tests for Phase 3
 
@@ -302,6 +303,8 @@ Full suite: 161 tests (42 Phase 2 + 80 Phase 1 + 39 Phase 0) — all passing.
 - `VendorProfile.test.tsx` — renders vendor details and contract list
 - `AllContracts.test.tsx` (16 tests) — page container, filter bar, loading skeleton, table rendering, contract rows, absent visualisation elements, pagination, empty/error states, API call on mount, sort resetting page to 1
 - `AccordionContracts.test.tsx` (24 tests) — loading/empty/error states, contracts table rendering, pagination, group-to-filter mapping for all 5 groupBy fields (category/supplier/buyer/award_type/month), parent filter preservation, leap year date handling, immutability of base filters, sort reset, API call correctness
+
+**Total frontend test count: 184 tests passing across 22 test files (vitest)**
 
 ##### ContractsTable — multi-column sort tests
 
@@ -627,7 +630,7 @@ Tests that require external services or API keys are decorated with conditional 
 - `test_performance.py::TestSortPerformance` (2 tests) — single/multi-column sort on 10k contracts
 - `test_performance.py::TestLoadPerformance` (2 tests) — load 10k <2s, 50k <10s
 - Frontend: `ErrorBoundary.tsx` and `LoadingSkeleton.tsx` components created; accessibility ARIA attributes added to 6 components
-- All 341 backend tests pass (+ 1 skipped), all 183 frontend tests pass
+- All 341 backend tests pass (+ 1 skipped), all 184 frontend tests pass
 
 #### Unlocks
 
