@@ -45,6 +45,12 @@ def main() -> int:
     parser.add_argument("--max-price", type=float, default=None)
     parser.add_argument("--user-agent", type=str, default=None)
     parser.add_argument("--pdf-dir", type=str, default="data/pdfs")
+    parser.add_argument(
+        "--ocr-workers",
+        type=int,
+        default=2,
+        help="Background workers for PDF text extraction during scraping",
+    )
     parser.add_argument("--log-level", type=str, default="INFO")
 
     # CRZ server-side filters (forwarded to scrape_crz.py)
@@ -121,6 +127,8 @@ def main() -> int:
         str(args.delay),
         "--pdf-dir",
         args.pdf_dir,
+        "--ocr-workers",
+        str(args.ocr_workers),
         "--log-level",
         args.log_level,
     ]

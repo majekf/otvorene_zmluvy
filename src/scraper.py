@@ -13,8 +13,10 @@ import os
 import re
 import shutil
 import subprocess
+import threading
 import time
 import unicodedata
+from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -47,6 +49,10 @@ DEFAULT_TIMEOUT = 10
 DEFAULT_DELAY = 3.0  # seconds between requests
 MAX_RETRIES = 3
 RETRY_BACKOFF = 1.5  # exponential backoff multiplier
+
+# pypdfium2/tesseract OCR fallback is not reliably thread-safe under high
+# parallelism in this environment. Serialize OCR calls to avoid native crashes.
+OCR_LOCK = threading.Lock()
 
 # Month name mapping (normalized Slovak month names to number)
 MONTH_MAP = {
@@ -466,12 +472,14 @@ def download_and_extract_pdf(
     session: requests.Session,
     agreement_context: Optional[str] = None,
     throttler: Optional[RequestThrottler] = None,
+    ocr_executor: Optional[ThreadPoolExecutor] = None,
 ) -> Dict[str, Any]:
-    """Download PDF and extract text."""
+    """Download PDF and optionally run text extraction in background."""
     result = {
         "pdf_url": pdf_url,
         "pdf_local_path": None,
         "pdf_text": None,
+        "text_future": None,
     }
 
     try:
@@ -497,38 +505,14 @@ def download_and_extract_pdf(
 
         result["pdf_local_path"] = pdf_path
 
-        try:
-            with pdfplumber.open(pdf_path) as pdf:
-                text_parts = []
-                for page in pdf.pages:
-                    page_text = page.extract_text()
-                    if page_text:
-                        text_parts.append(page_text)
-
-                full_text = "\n".join(text_parts)
-                result["pdf_text"] = full_text[:50000] if full_text else None
-
-                logger.info(f"Extracted {len(full_text)} chars from PDF")
-
-                if not _is_readable_text(result["pdf_text"]):
-                    logger.info(
-                        "Text extraction returned too little text, trying OCR fallback"
-                    )
-                    ocr_text = extract_text_with_ocr(pdf_path)
-                    if ocr_text:
-                        result["pdf_text"] = ocr_text[:50000]
-                        logger.info(
-                            "OCR fallback extracted %d chars", len(result["pdf_text"])
-                        )
-        except Exception as e:
-            logger.warning(f"Failed to extract text from PDF {pdf_path}: {e}")
-            ocr_text = extract_text_with_ocr(pdf_path)
-            if ocr_text:
-                result["pdf_text"] = ocr_text[:50000]
-                logger.info(
-                    "OCR fallback extracted %d chars after pdfplumber failure",
-                    len(result["pdf_text"]),
-                )
+        if ocr_executor:
+            logger.info("Scheduling async PDF text extraction")
+            result["text_future"] = ocr_executor.submit(
+                _extract_pdf_text_with_fallback,
+                pdf_path,
+            )
+        else:
+            result["pdf_text"] = _extract_pdf_text_with_fallback(pdf_path)
 
     except Exception as e:
         logger.error(f"Failed to download/process PDF {pdf_url}: {e}")
@@ -541,6 +525,49 @@ def _is_readable_text(text: Optional[str], min_chars: int = 30) -> bool:
     if not text:
         return False
     return len("".join(text.split())) >= min_chars
+
+
+def _extract_pdf_text_with_fallback(pdf_path: str) -> Optional[str]:
+    """Extract text via pdfplumber, then OCR fallback for scanned PDFs."""
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            text_parts = []
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text_parts.append(page_text)
+
+            full_text = "\n".join(text_parts)
+            text = full_text[:50000] if full_text else None
+            logger.info("Extracted %d chars from PDF", len(full_text))
+
+            if _is_readable_text(text):
+                return text
+
+            logger.info("Text extraction returned too little text, trying OCR fallback")
+            ocr_text = _extract_text_with_ocr_threadsafe(pdf_path)
+            if ocr_text:
+                clipped = ocr_text[:50000]
+                logger.info("OCR fallback extracted %d chars", len(clipped))
+                return clipped
+            return text
+    except Exception as e:
+        logger.warning("Failed to extract text from PDF %s: %s", pdf_path, e)
+        ocr_text = _extract_text_with_ocr_threadsafe(pdf_path)
+        if ocr_text:
+            clipped = ocr_text[:50000]
+            logger.info(
+                "OCR fallback extracted %d chars after pdfplumber failure",
+                len(clipped),
+            )
+            return clipped
+    return None
+
+
+def _extract_text_with_ocr_threadsafe(pdf_path: str) -> Optional[str]:
+    """Run OCR fallback under a process-wide lock to avoid native crashes."""
+    with OCR_LOCK:
+        return extract_text_with_ocr(pdf_path)
 
 
 def extract_text_with_ocr(
@@ -712,6 +739,7 @@ def scrape_contracts(
     max_price: Optional[float] = None,
     user_agent: str = DEFAULT_USER_AGENT,
     pdf_dir: str = "data/pdfs",
+    ocr_workers: int = 2,
 ) -> int:
     """
     Main scraping function.
@@ -728,6 +756,8 @@ def scrape_contracts(
         max_price: Maximum accepted contract value in EUR (inclusive)
         user_agent: Custom User-Agent header
         pdf_dir: Directory to save PDFs
+        ocr_workers: Number of background workers for PDF text extraction
+            (including OCR fallback when needed)
 
     Returns:
         Number of contracts scraped
@@ -745,11 +775,11 @@ def scrape_contracts(
 
     contracts_processed = 0
     pdfs_downloaded = 0
+    scraped_contracts: List[Dict[str, Any]] = []
+    pending_text_jobs: List[Dict[str, Any]] = []
 
     try:
-        with open(output_file, "w", encoding="utf-8") as out_f:
-            out_f.write("[\n")
-            first_record = True
+        with ThreadPoolExecutor(max_workers=max(1, ocr_workers)) as ocr_executor:
             for page_num in range(start_page, start_page + max_pages):
                 url_page = page_num - 1
                 page_url = build_listing_page_url(
@@ -841,11 +871,23 @@ def scrape_contracts(
                                         session,
                                         agreement_context=agreement_context,
                                         throttler=throttler,
+                                        ocr_executor=ocr_executor,
                                     )
+
+                                    text_future = pdf_result.pop("text_future", None)
 
                                     if pdf_result["pdf_local_path"]:
                                         contract_data.update(pdf_result)
                                         pdfs_downloaded += 1
+
+                                    if isinstance(text_future, Future):
+                                        pending_text_jobs.append(
+                                            {
+                                                "future": text_future,
+                                                "contract_data": contract_data,
+                                                "agreement_context": agreement_context,
+                                            }
+                                        )
 
                                     skipped_attachments = max(0, len(pdf_urls) - 1)
                                     if skipped_attachments:
@@ -855,10 +897,7 @@ def scrape_contracts(
                                             agreement_context,
                                         )
 
-                        if not first_record:
-                            out_f.write(",\n")
-                        out_f.write(json.dumps(contract_data, ensure_ascii=False))
-                        first_record = False
+                        scraped_contracts.append(contract_data)
                         contracts_processed += 1
 
                     except Exception as e:
@@ -870,7 +909,32 @@ def scrape_contracts(
                 if max_contracts is not None and contracts_processed >= max_contracts:
                     break
 
-            out_f.write("\n]\n")
+            if pending_text_jobs:
+                logger.info(
+                    "Waiting for %d background text extraction jobs to finish",
+                    len(pending_text_jobs),
+                )
+
+            for text_job in pending_text_jobs:
+                try:
+                    extracted_text = text_job["future"].result()
+                    if extracted_text:
+                        text_job["contract_data"]["pdf_text"] = extracted_text[:50000]
+                        logger.info(
+                            "Text extraction finished for %s: %d chars",
+                            text_job["agreement_context"],
+                            len(text_job["contract_data"]["pdf_text"]),
+                        )
+                except Exception as text_error:
+                    logger.warning(
+                        "Background text extraction failed for %s: %s",
+                        text_job["agreement_context"],
+                        text_error,
+                    )
+
+        with open(output_file, "w", encoding="utf-8") as out_f:
+            out_f.write(json.dumps(scraped_contracts, ensure_ascii=False, indent=2))
+            out_f.write("\n")
 
     except Exception as e:
         logger.error(f"Scraping failed: {e}")

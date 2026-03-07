@@ -149,6 +149,13 @@ Examples:
         default="slk+eng",
         help="Tesseract OCR language(s), e.g. 'slk+eng' (default: slk+eng)"
     )
+
+    parser.add_argument(
+        "--ocr-workers",
+        type=int,
+        default=2,
+        help="Number of background PDF text extraction workers (includes OCR fallback, default: 2)"
+    )
     
     args = parser.parse_args()
     
@@ -170,6 +177,7 @@ Examples:
     logger.info(f"  Max price: {args.max_price}")
     logger.info(f"  PDF dir: {args.pdf_dir}")
     logger.info(f"  OCR JSON mode: {bool(args.ocr_json)}")
+    logger.info(f"  OCR workers: {args.ocr_workers}")
     
     try:
         crz_filters = {
@@ -218,6 +226,7 @@ Examples:
             max_price=args.max_price,
             user_agent=args.user_agent,
             pdf_dir=args.pdf_dir,
+            ocr_workers=args.ocr_workers,
         )
         
         logger.info(f"Success! Scraped {contracts_count} contracts to {args.out}")
