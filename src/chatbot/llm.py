@@ -128,9 +128,15 @@ class OpenAIClient(LLMClient):
     _MAX_RETRIES = 3
     _BASE_DELAY = 1.0  # seconds
 
-    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4o-mini"):
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model: str = "gpt-4.1-nano",
+        temperature: float = 0.2,
+    ):
         self._api_key = api_key or os.getenv("OPENAI_API_KEY", "")
         self._model = model
+        self._temperature = temperature
         self._client: Any = None
         self._circuit_failures = 0
         self._circuit_open = False
@@ -193,6 +199,7 @@ class OpenAIClient(LLMClient):
             resp = await self._client.chat.completions.create(
                 model=self._model,
                 messages=messages,
+                temperature=self._temperature,
             )
             return resp.choices[0].message.content
 
@@ -221,6 +228,7 @@ class OpenAIClient(LLMClient):
                 stream=True,
                 stream_options={"include_usage": True},
                 stop=stop_tokens,
+                temperature=self._temperature,
             )
             async for chunk in stream:
                 if chunk.usage:
@@ -265,7 +273,7 @@ def create_llm_client(
     if provider == "openai" and api_key:
         client = OpenAIClient(api_key=api_key, **kwargs)
         if client.available:
-            logger.info("Using OpenAI LLM client (model=%s)", kwargs.get("model", "gpt-4o-mini"))
+            logger.info("Using OpenAI LLM client (model=%s)", kwargs.get("model", "gpt-4.1-nano"))
             return client
         logger.warning("OpenAI client not available — falling back to mock")
     elif provider not in ("mock", ""):

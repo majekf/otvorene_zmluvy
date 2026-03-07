@@ -39,6 +39,7 @@ const COLUMNS: ColumnDef[] = [
         to={`/contract/${c.contract_id}`}
         className="text-primary-600 hover:text-primary-800 font-medium transition-colors"
         title={c.contract_title || ''}
+        onClick={(e) => e.stopPropagation()}
       >
         {c.contract_title || '—'}
       </Link>
@@ -50,7 +51,11 @@ const COLUMNS: ColumnDef[] = [
     sortable: true,
     render: (c) =>
       c.supplier ? (
-        <Link to={`/vendor/${encodeURIComponent(c.supplier)}`} className="text-primary-600 hover:text-primary-800 transition-colors">
+        <Link
+          to={`/vendor/${encodeURIComponent(c.supplier)}`}
+          className="text-primary-600 hover:text-primary-800 transition-colors"
+          onClick={(e) => e.stopPropagation()}
+        >
           {c.supplier}
         </Link>
       ) : (
@@ -63,7 +68,11 @@ const COLUMNS: ColumnDef[] = [
     sortable: true,
     render: (c) =>
       c.buyer ? (
-        <Link to={`/institution/${encodeURIComponent(c.buyer)}`} className="text-primary-600 hover:text-primary-800 transition-colors">
+        <Link
+          to={`/institution/${encodeURIComponent(c.buyer)}`}
+          className="text-primary-600 hover:text-primary-800 transition-colors"
+          onClick={(e) => e.stopPropagation()}
+        >
           {c.buyer}
         </Link>
       ) : (

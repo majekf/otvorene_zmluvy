@@ -64,6 +64,11 @@ function renderChatBar(props = {}) {
   );
 }
 
+async function openChatPanel() {
+  const launcher = await screen.findByTestId('chat-launcher');
+  fireEvent.click(launcher);
+}
+
 describe('ChatBar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -82,6 +87,7 @@ describe('ChatBar', () => {
     });
 
     renderChatBar();
+    await openChatPanel();
     expect(screen.getByText(/GovLens Chat/)).toBeInTheDocument();
   });
 
@@ -93,6 +99,7 @@ describe('ChatBar', () => {
     });
 
     renderChatBar();
+    await openChatPanel();
 
     await waitFor(() => {
       expect(screen.getByTestId('degraded-banner')).toBeInTheDocument();
@@ -107,6 +114,7 @@ describe('ChatBar', () => {
     });
 
     renderChatBar();
+    await openChatPanel();
 
     await waitFor(() => {
       expect(screen.queryByTestId('degraded-banner')).not.toBeInTheDocument();
@@ -121,6 +129,7 @@ describe('ChatBar', () => {
     });
 
     renderChatBar();
+    await openChatPanel();
 
     const input = screen.getByLabelText('Chat input');
     fireEvent.change(input, { target: { value: 'What are top vendors?' } });
@@ -147,6 +156,7 @@ describe('ChatBar', () => {
     });
 
     renderChatBar();
+    await openChatPanel();
 
     const input = screen.getByLabelText('Chat input');
     fireEvent.change(input, { target: { value: 'Hello' } });
@@ -177,6 +187,7 @@ describe('ChatBar', () => {
     });
 
     renderChatBar();
+    await openChatPanel();
 
     const input = screen.getByLabelText('Chat input');
     fireEvent.change(input, { target: { value: 'test' } });
@@ -200,6 +211,7 @@ describe('ChatBar', () => {
     });
 
     renderChatBar();
+    await openChatPanel();
 
     const input = screen.getByLabelText('Chat input');
     fireEvent.change(input, { target: { value: 'test' } });
@@ -235,6 +247,7 @@ describe('ChatBar', () => {
       filters: { institutions: ['Mesto Bratislava'], categories: ['IT'] },
       contractCount: 42,
     });
+    await openChatPanel();
 
     await waitFor(() => {
       const input = screen.getByLabelText('Chat input');
@@ -251,6 +264,7 @@ describe('ChatBar', () => {
     });
 
     renderChatBar();
+    await openChatPanel();
 
     const input = screen.getByLabelText('Chat input');
     fireEvent.change(input, { target: { value: 'test' } });
@@ -290,6 +304,7 @@ describe('ChatBar', () => {
     });
 
     renderChatBar({ onFilterUpdate });
+    await openChatPanel();
 
     const input = screen.getByLabelText('Chat input');
     fireEvent.change(input, { target: { value: 'test' } });
@@ -332,6 +347,7 @@ describe('ChatBar', () => {
     });
 
     renderChatBar();
+    await openChatPanel();
 
     const input = screen.getByLabelText('Chat input');
     fireEvent.change(input, { target: { value: 'test' } });
@@ -368,6 +384,7 @@ describe('ChatBar', () => {
     });
 
     renderChatBar();
+    await openChatPanel();
 
     const input = screen.getByLabelText('Chat input');
     fireEvent.change(input, { target: { value: 'test' } });
@@ -408,6 +425,7 @@ describe('ChatBar', () => {
     });
 
     renderChatBar();
+    await openChatPanel();
 
     const input = screen.getByLabelText('Chat input');
     fireEvent.change(input, { target: { value: 'Hello' } });
@@ -426,6 +444,7 @@ describe('ChatBar', () => {
     });
 
     renderChatBar();
+    await openChatPanel();
 
     const input = screen.getByLabelText('Chat input');
     fireEvent.change(input, { target: { value: 'test' } });
@@ -458,6 +477,7 @@ describe('ChatBar', () => {
     });
 
     renderChatBar();
+    await openChatPanel();
 
     const input = screen.getByLabelText('Chat input');
     fireEvent.change(input, { target: { value: 'Hi' } });

@@ -747,7 +747,7 @@ python scrape_crz.py --start-page 1 --max-pages 1 --log-level DEBUG
 
 ## Version History
 
-### v1.9.0 — Phase 8: Polish, Integration Testing, and Deployment (2026-03-06)
+### v1.9.0 — Phase 8: Polish, Integration Testing, and Deployment 
 
 - 15 E2E integration tests (`test_e2e.py`), 14 performance benchmarks (`test_performance.py`)
 - `ErrorBoundary.tsx` wrapping all routes with retry and error details
@@ -757,7 +757,7 @@ python scrape_crz.py --start-page 1 --max-pages 1 --log-level DEBUG
 - Makefile + start_dev.sh + start_dev.ps1 dev scripts
 - GitHub Actions CI pipeline (4 jobs: backend-tests, frontend-tests, lint, build)
 
-### v1.4.0 — Phase 3: Frontend: Institution Lens UI (2026-03-03)
+### v1.4.0 — Phase 3: Frontend: Institution Lens UI 
 
 - React 18 + TypeScript + Vite frontend in `frontend/`
 - Tailwind CSS v4 via `@tailwindcss/vite` plugin
@@ -770,7 +770,7 @@ python scrape_crz.py --start-page 1 --max-pages 1 --log-level DEBUG
 - API client for all backend endpoints
 - 71 unit tests in 13 test files (vitest + @testing-library/react)
 
-### v1.3.0 — Phase 2: Backend API (FastAPI) (2026-03-03)
+### v1.3.0 — Phase 2: Backend API (FastAPI) 
 
 - FastAPI application in `src/api.py` with 17 REST endpoints
 - `src/config.py` for environment-variable-based configuration
@@ -780,14 +780,14 @@ python scrape_crz.py --start-page 1 --max-pages 1 --log-level DEBUG
 - Added `fastapi`, `uvicorn[standard]`, `httpx` to dependencies
 - 33 new unit tests in `tests/test_api.py`
 
-### v1.2.0 — Phase 1: In-Memory Query & Aggregation Engine (2026-03-03)
+### v1.2.0 — Phase 1: In-Memory Query & Aggregation Engine 
 
 - `DataStore` class in `src/engine.py` — loads JSON, holds Contract objects in RAM
 - Filtering, grouping, aggregation, search, benchmarking, trends, rankings
 - `sort_contracts(contracts, sort_spec)` — multi-column sort; `SORTABLE_FIELDS` whitelist; `None` values always last
 - 95 unit tests in `tests/test_engine.py` (Phase 1 base + Phase 6 investigation modes)
 
-### v1.1.0 — Phase 0: GovLens Data Foundation (2026-03-03)
+### v1.1.0 — Phase 0: GovLens Data Foundation 
 
 - Pydantic v2 data models (Contract, Institution, Vendor, FilterState, AggregationResult)
 - Three new enrichment fields: category, pdf_text_summary, award_type
@@ -796,7 +796,7 @@ python scrape_crz.py --start-page 1 --max-pages 1 --log-level DEBUG
 - .env.example configuration template
 - 39 new unit tests
 
-### v1.0.0 (2026-03-01)
+### v1.0.0 
 
 Initial release with:
 - Pagination support

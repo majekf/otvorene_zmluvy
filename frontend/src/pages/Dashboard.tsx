@@ -73,7 +73,7 @@ export default function Dashboard() {
         setTreemapData(treemapRes);
         setError(null);
       })
-      .catch((err) => {
+      .catch(() => {
         if (!cancelled) setError('Failed to load data. Please try again.');
       })
       .finally(() => {

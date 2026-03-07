@@ -11,10 +11,11 @@ services:
       - GOVLENS_HOST=0.0.0.0
       - GOVLENS_PORT=8000
       - GOVLENS_DATA_PATH=data/sample_contracts.json
-      - LLM_PROVIDER=mock
-      # Uncomment and set for real LLM:
-      # - OPENAI_API_KEY=${OPENAI_API_KEY}
-      # - LLM_PROVIDER=openai
+      # Read provider/key from env file or shell.
+      - LLM_PROVIDER=${LLM_PROVIDER:-mock}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4.1-nano}
+      - OPENAI_TEMPERATURE=${OPENAI_TEMPERATURE:-0.2}
     volumes:
       - ./data:/app/data
     restart: unless-stopped

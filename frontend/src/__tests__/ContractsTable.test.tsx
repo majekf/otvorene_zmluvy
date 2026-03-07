@@ -104,4 +104,46 @@ describe('ContractsTable', () => {
     fireEvent.click(screen.getByTestId('row-abc123'));
     expect(onRowClick).toHaveBeenCalledWith('abc123');
   });
+
+  it('clicking vendor link does not trigger row navigation', () => {
+    const onRowClick = vi.fn();
+    renderTable([makeContract({ contract_id: 'c1', supplier: 'Vendor X' })], [], vi.fn(), onRowClick);
+    const vendorLink = screen.getByRole('link', { name: 'Vendor X' });
+    fireEvent.click(vendorLink);
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it('clicking institution link does not trigger row navigation', () => {
+    const onRowClick = vi.fn();
+    renderTable([makeContract({ contract_id: 'c1', buyer: 'Institution A' })], [], vi.fn(), onRowClick);
+    const institutionLink = screen.getByRole('link', { name: 'Institution A' });
+    fireEvent.click(institutionLink);
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it('clicking title link does not trigger row navigation (prevents double history push)', () => {
+    const onRowClick = vi.fn();
+    renderTable([makeContract({ contract_id: 'c1', contract_title: 'Test Contract' })], [], vi.fn(), onRowClick);
+    const titleLink = screen.getByRole('link', { name: 'Test Contract' });
+    fireEvent.click(titleLink);
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it('vendor link points to vendor profile page', () => {
+    renderTable([makeContract({ supplier: 'Vendor X' })]);
+    const vendorLink = screen.getByRole('link', { name: 'Vendor X' });
+    expect(vendorLink).toHaveAttribute('href', '/vendor/Vendor%20X');
+  });
+
+  it('institution link points to institution profile page', () => {
+    renderTable([makeContract({ buyer: 'Institution A' })]);
+    const institutionLink = screen.getByRole('link', { name: 'Institution A' });
+    expect(institutionLink).toHaveAttribute('href', '/institution/Institution%20A');
+  });
+
+  it('title link points to contract detail page', () => {
+    renderTable([makeContract({ contract_id: 'c1', contract_title: 'Test Contract' })]);
+    const titleLink = screen.getByRole('link', { name: 'Test Contract' });
+    expect(titleLink).toHaveAttribute('href', '/contract/c1');
+  });
 });

@@ -82,9 +82,18 @@ _rule_engine = RuleEngine()
 _llm_client = create_llm_client(
     provider=settings.llm_provider,
     api_key=settings.openai_api_key or settings.anthropic_api_key,
+    model=settings.openai_model,
+    temperature=settings.openai_temperature,
 )
 _chat_history = create_history(backend=settings.chat_history_backend)
 _usage_tracker = UsageTracker(enabled=settings.chat_cost_tracking)
+
+
+def _runtime_chat_state() -> Tuple[str, bool]:
+    """Return effective provider and degraded flag for the active chat client."""
+    if isinstance(_llm_client, MockLLMClient):
+        return "mock", True
+    return settings.llm_provider, False
 
 app.add_middleware(
     CORSMiddleware,
@@ -1076,9 +1085,10 @@ def chat_status():
 
     Never exposes API key values.
     """
+    provider, degraded = _runtime_chat_state()
     return {
-        "provider": settings.llm_provider,
-        "degraded": settings.is_degraded,
+        "provider": provider,
+        "degraded": degraded,
         "features": settings.active_features,
     }
 
@@ -1173,10 +1183,11 @@ async def chat_websocket(websocket: WebSocket):
                 filters = FilterState()
 
             # Send start frame
+            provider, degraded = _runtime_chat_state()
             start = StartFrame(
                 session_id=session_id,
-                degraded=settings.is_degraded,
-                provider=settings.llm_provider,
+                degraded=degraded,
+                provider=provider,
             )
             await websocket.send_text(start.model_dump_json())
 
@@ -1206,11 +1217,11 @@ async def chat_websocket(websocket: WebSocket):
 
             # Build messages for LLM
             system_prompt = (
-                "You are GovLens, an AI assistant for investigating Slovak "
-                "government contracts from crz.gov.sk. Answer based ONLY on "
-                "the contract data provided in the context. Be concise and "
-                "factual. If you cannot answer from the data, say so.\n\n"
-                f"CONTEXT:\n{context_str}"
+                "You are GovLens Assistant. Follow the RULES in the context "
+                "strictly and answer only from the provided contracts. "
+                "If data is missing, state it explicitly. Keep answers useful, "
+                "analytical, and concise.\n\n"
+                f"{context_str}"
             )
 
             history = _chat_history.get(session_id)
