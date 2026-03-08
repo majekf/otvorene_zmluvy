@@ -113,6 +113,8 @@ describe('AllContracts', () => {
       institution_icos: [],
       vendor_icos: [],
       categories: [],
+      scanned_service_types: [],
+      scanned_service_subtypes: [],
     });
   });
 
@@ -164,6 +166,7 @@ describe('AllContracts', () => {
       expect(screen.getByTestId('th-scanned_suggested_title')).toHaveTextContent('Subject');
       expect(screen.getByTestId('th-scanned_service_type')).toHaveTextContent('Type');
       expect(screen.getByTestId('th-scanned_service_subtype')).toHaveTextContent('Subtype');
+      expect(screen.queryByTestId('th-category')).not.toBeInTheDocument();
       expect(screen.queryByTestId('th-award_type')).not.toBeInTheDocument();
     });
   });
@@ -271,6 +274,22 @@ describe('AllContracts', () => {
       const callArgs = vi.mocked(api.fetchContracts).mock.calls[0];
       // page argument (index 1) should be 1
       expect(callArgs[1]).toBe(1);
+    });
+  });
+
+  it('sends Subject sort to API in all-contracts table', async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('contracts-table')).toBeInTheDocument();
+    });
+
+    vi.mocked(api.fetchContracts).mockClear();
+    fireEvent.click(screen.getByTestId('th-scanned_suggested_title'));
+
+    await waitFor(() => {
+      expect(api.fetchContracts).toHaveBeenCalled();
+      const callArgs = vi.mocked(api.fetchContracts).mock.calls[0];
+      expect(callArgs[3]).toEqual([['scanned_suggested_title', 'asc']]);
     });
   });
 });

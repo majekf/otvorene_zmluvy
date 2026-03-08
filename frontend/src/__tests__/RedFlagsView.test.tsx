@@ -57,6 +57,8 @@ describe('RedFlagsView', () => {
     vi.mocked(api.fetchFilterOptions).mockResolvedValue({
       institutions: [], categories: [], vendors: [],
       institution_icos: [], vendor_icos: [],
+      scanned_service_types: [],
+      scanned_service_subtypes: [],
     });
   });
 

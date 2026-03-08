@@ -32,10 +32,22 @@ const makeContract = (overrides: Partial<Contract> = {}): Contract => ({
   ...overrides,
 });
 
-function renderTable(contracts: Contract[], sort: SortSpec = [], onSortChange = vi.fn(), onRowClick = vi.fn()) {
+function renderTable(
+  contracts: Contract[],
+  sort: SortSpec = [],
+  onSortChange = vi.fn(),
+  onRowClick = vi.fn(),
+  variant: 'default' | 'all-contracts' = 'default',
+) {
   return render(
     <MemoryRouter>
-      <ContractsTable contracts={contracts} sort={sort} onSortChange={onSortChange} onRowClick={onRowClick} />
+      <ContractsTable
+        contracts={contracts}
+        sort={sort}
+        onSortChange={onSortChange}
+        onRowClick={onRowClick}
+        variant={variant}
+      />
     </MemoryRouter>,
   );
 }
@@ -52,6 +64,11 @@ describe('ContractsTable', () => {
     expect(screen.getByText('Test Contract')).toBeInTheDocument();
     expect(screen.getByText('Vendor X')).toBeInTheDocument();
     expect(screen.getByText('Institution A')).toBeInTheDocument();
+  });
+
+  it('does not render Category column in default table', () => {
+    renderTable([makeContract()]);
+    expect(screen.queryByTestId('th-category')).not.toBeInTheDocument();
   });
 
   it('calls onSortChange on header click', () => {
@@ -145,5 +162,31 @@ describe('ContractsTable', () => {
     renderTable([makeContract({ contract_id: 'c1', contract_title: 'Test Contract' })]);
     const titleLink = screen.getByRole('link', { name: 'Test Contract' });
     expect(titleLink).toHaveAttribute('href', '/contract/c1');
+  });
+
+  it('all-contracts variant enables sorting on Subject, Type, and Subtype', () => {
+    const onSortChange = vi.fn();
+    renderTable(
+      [
+        makeContract({
+          scanned_suggested_title: 'Managed services',
+          scanned_service_type: 'it_services',
+          scanned_service_subtype: 'helpdesk',
+        }),
+      ],
+      [],
+      onSortChange,
+      vi.fn(),
+      'all-contracts',
+    );
+
+    fireEvent.click(screen.getByTestId('th-scanned_suggested_title'));
+    expect(onSortChange).toHaveBeenCalledWith([['scanned_suggested_title', 'asc']]);
+
+    fireEvent.click(screen.getByTestId('th-scanned_service_type'));
+    expect(onSortChange).toHaveBeenCalledWith([['scanned_service_type', 'asc']]);
+
+    fireEvent.click(screen.getByTestId('th-scanned_service_subtype'));
+    expect(onSortChange).toHaveBeenCalledWith([['scanned_service_subtype', 'asc']]);
   });
 });

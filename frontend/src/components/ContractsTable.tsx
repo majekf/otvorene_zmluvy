@@ -94,14 +94,6 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
     render: (c) => formatDate(c.published_date),
   },
   {
-    key: 'category',
-    label: 'Category',
-    sortable: true,
-    render: (c) => (
-      <span className="chip chip-blue">{c.category}</span>
-    ),
-  },
-  {
     key: 'award_type',
     label: 'Award',
     sortable: true,
@@ -124,24 +116,24 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
 ];
 
 const ALL_CONTRACTS_COLUMNS: ColumnDef[] = [
-  ...DEFAULT_COLUMNS.slice(0, 6),
+  ...DEFAULT_COLUMNS.slice(0, 5),
   {
     key: 'scanned_suggested_title',
     label: 'Subject',
-    sortable: false,
+    sortable: true,
     className: 'max-w-[260px] truncate',
     render: (c) => c.scanned_suggested_title || 'â€”',
   },
   {
     key: 'scanned_service_type',
     label: 'Type',
-    sortable: false,
+    sortable: true,
     render: (c) => c.scanned_service_type || 'â€”',
   },
   {
     key: 'scanned_service_subtype',
     label: 'Subtype',
-    sortable: false,
+    sortable: true,
     render: (c) => c.scanned_service_subtype || 'â€”',
   },
 ];

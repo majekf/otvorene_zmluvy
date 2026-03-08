@@ -28,6 +28,9 @@ SORTABLE_FIELDS: frozenset = frozenset({
     "buyer",
     "supplier",
     "category",
+    "scanned_suggested_title",
+    "scanned_service_type",
+    "scanned_service_subtype",
     "award_type",
     "date_published",
     "date_concluded",
@@ -35,9 +38,9 @@ SORTABLE_FIELDS: frozenset = frozenset({
 })
 
 
-def _sort_key(field: str, descending: bool):
+def _sort_key(value_getter, descending: bool):
     """
-    Return a key function that extracts *field* from a Contract.
+    Return a key function that extracts a sort value from a Contract.
 
     None values are always placed last regardless of sort direction:
     - ascending  (reverse=False): non-None → (0, val), None → (1, 0)
@@ -46,7 +49,11 @@ def _sort_key(field: str, descending: bool):
     Strings are lower-cased so the sort is case-insensitive.
     """
     def key(c: Contract) -> tuple:
-        val = getattr(c, field, None)
+        val = value_getter(c)
+        if isinstance(val, str):
+            val = val.strip()
+            if not val:
+                val = None
         if val is None:
             return (0, 0) if descending else (1, 0)
         normalized = val.lower() if isinstance(val, str) else val
@@ -170,6 +177,21 @@ class DataStore:
             if text:
                 return text
         return ""
+
+    def _sort_field_value(self, contract: Contract, field: str):
+        """Resolve the canonical value used for sorting a given field."""
+        if field == "category":
+            return self._category_label(contract) or None
+        if field == "scanned_service_type":
+            return self._scanned_service_type(contract) or None
+        if field == "scanned_service_subtype":
+            return self._scanned_service_subtype(contract) or None
+        if field == "scanned_suggested_title":
+            val = getattr(contract, "scanned_suggested_title", None)
+            if val is None:
+                val = contract.model_dump().get("scanned_suggested_title")
+            return val
+        return getattr(contract, field, None)
 
     def filter(self, filters: FilterState) -> List[Contract]:
         """
@@ -684,7 +706,10 @@ class DataStore:
         result = list(contracts)
         for field, direction in reversed(valid_spec):
             descending = direction.lower() == "desc"
-            result.sort(key=_sort_key(field, descending), reverse=descending)
+            result.sort(
+                key=_sort_key(lambda c, f=field: self._sort_field_value(c, f), descending),
+                reverse=descending,
+            )
 
         return result
 
