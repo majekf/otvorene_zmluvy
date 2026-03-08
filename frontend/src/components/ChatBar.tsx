@@ -27,9 +27,10 @@ interface ChatBarProps {
   filters: FilterState;
   onFilterUpdate?: (filters: Partial<FilterState>) => void;
   contractCount?: number;
+  contractId?: string;
 }
 
-export default function ChatBar({ filters, onFilterUpdate, contractCount }: ChatBarProps) {
+export default function ChatBar({ filters, onFilterUpdate, contractCount, contractId }: ChatBarProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
@@ -61,6 +62,9 @@ export default function ChatBar({ filters, onFilterUpdate, contractCount }: Chat
 
   // Dynamic placeholder
   const placeholder = (() => {
+    if (contractId) {
+      return 'Ask anything about this contract…';
+    }
     const parts: string[] = [];
     if (filters.institutions?.length) {
       parts.push(filters.institutions.join(', '));
@@ -101,13 +105,22 @@ export default function ChatBar({ filters, onFilterUpdate, contractCount }: Chat
     setStreaming(true);
 
     ws.onopen = () => {
-      ws.send(
-        JSON.stringify({
-          message: text,
-          filters,
-          session_id: sessionId,
-        }),
-      );
+      const payload: Record<string, unknown> = {
+        message: text,
+        filters,
+        session_id: sessionId,
+      };
+      if (contractId) {
+        payload.contract_id = contractId;
+      }
+      const sep = '═'.repeat(72);
+      console.group(`%c[GovLens Chat] ${contractId ? `contract=${contractId}` : 'dashboard'} · session=${sessionId}`, 'color: #6366f1; font-weight: bold');
+      console.log('%cUser message', 'color: #10b981; font-weight: bold', text);
+      console.log('%cPayload sent to backend', 'color: #f59e0b; font-weight: bold', payload);
+      console.log('%cFilters', 'color: #64748b', filters);
+      console.groupEnd();
+      console.log(sep);
+      ws.send(JSON.stringify(payload));
     };
 
     ws.onmessage = (event) => {
@@ -205,7 +218,7 @@ export default function ChatBar({ filters, onFilterUpdate, contractCount }: Chat
       setStreaming(false);
       wsRef.current = null;
     };
-  }, [input, streaming, filters, sessionId, status]);
+  }, [input, streaming, filters, sessionId, status, contractId]);
 
   const handleCancel = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -261,7 +274,7 @@ export default function ChatBar({ filters, onFilterUpdate, contractCount }: Chat
           data-testid="chat-launcher"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" /></svg>
-          <span className="text-sm font-semibold">GovLens Chat</span>
+          <span className="text-sm font-semibold">{contractId ? 'Contract Chat' : 'GovLens Chat'}</span>
           {unreadCount > 0 && (
             <span className="inline-flex items-center justify-center min-w-5 h-5 rounded-full bg-white/20 px-1.5 text-xs font-bold">
               {unreadCount}
@@ -276,7 +289,7 @@ export default function ChatBar({ filters, onFilterUpdate, contractCount }: Chat
           <div className="px-4 py-3 text-left text-sm font-medium text-slate-700 bg-slate-50/90 border-b border-slate-200/70 flex items-center justify-between">
             <span className="flex items-center gap-2">
               <svg className="w-4 h-4 text-primary-500" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" /></svg>
-              GovLens Chat
+              {contractId ? 'Contract Chat' : 'GovLens Chat'}
             </span>
             <button
               onClick={() => setExpanded(false)}

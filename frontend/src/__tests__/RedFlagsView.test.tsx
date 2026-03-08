@@ -57,8 +57,12 @@ describe('RedFlagsView', () => {
     vi.mocked(api.fetchFilterOptions).mockResolvedValue({
       institutions: [], categories: [], vendors: [],
       institution_icos: [], vendor_icos: [],
+<<<<<<< HEAD
       scanned_service_types: [],
       scanned_service_subtypes: [],
+=======
+      scanned_service_types: [], scanned_service_subtypes: [],
+>>>>>>> d5450f9 (add chatot on contract page + sample cotracts)
     });
   });
 

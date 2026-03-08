@@ -385,3 +385,172 @@ def build_scoped_context(
     if use_cache:
         _cache.put(filters, *result)
     return result
+
+
+# ── Single-contract context ──────────────────────────────────────────
+
+
+def build_contract_context(
+    contract: Contract,
+    tender: Optional[Dict[str, Any]] = None,
+) -> str:
+    """Build a rich single-contract system prompt for focused contract analysis.
+
+    Includes ALL contract fields (including scanned_* fields, pdf_text, subcontractors)
+    and, when available, the related tender record from tenders.json.
+    """
+    record = contract.model_dump(exclude_none=False)
+
+    lines: List[str] = [
+        "You are GovLens Assistant, specialised in analysing a SINGLE government contract.",
+        "Use only the information provided below. Do not invent missing values.",
+        "Answer in the same language as the user message (Slovak, Czech, or English).",
+        "",
+        "RULES",
+        "",
+        "- Answer strictly from the contract data provided in this context.",
+        "- Do not invent missing values; if a field is 'not extracted' state it explicitly.",
+        "- If supplier ICO values from different sources conflict, proactively flag the mismatch.",
+        "- You may compute totals, comparisons, and flag potential anomalies.",
+        "- Respond in the same language as the user message (Slovak, Czech, or English).",
+        "",
+        "═══════════════════════════════════════════════════════════",
+        "CONTRACT RECORD",
+        "═══════════════════════════════════════════════════════════",
+        "",
+    ]
+
+    # ── ICO mismatch warning ─────────────────────────────────────
+    supplier_ico = record.get("ico_supplier")
+    scanned_ico = (
+        record.get("scanovane_ico_dodavatela")
+        or record.get("ico_supplier_scanned")
+        or record.get("ico_supplier_pdf")
+        or record.get("scanned_supplier_ico")
+    )
+    if supplier_ico and scanned_ico and str(supplier_ico).strip() != str(scanned_ico).strip():
+        lines.append(
+            f"⚠ WARNING [ico_mismatch]: website supplier ICO={supplier_ico}, "
+            f"scanned supplier ICO={scanned_ico}"
+        )
+        lines.append("")
+
+    # ── All contract fields ──────────────────────────────────────
+    # Emit every field with human label and raw JSON key
+    for key, value in record.items():
+        if key == "pdf_text":
+            continue  # handle separately below
+        label = _humanize_field_name(key)
+        # Nested structures (e.g. scanned_subcontractors) — dump as readable JSON
+        if isinstance(value, (dict, list)) and value:
+            if isinstance(value, list) and all(isinstance(v, dict) for v in value):
+                lines.append(f"{label} [{key}] ({len(value)} items):")
+                for si, sub in enumerate(value, 1):
+                    lines.append(f"  {si}.")
+                    for sk, sv in sub.items():
+                        lines.append(f"    {sk}: {sv}")
+            else:
+                rendered = _format_field_value(key, value)
+                lines.append(f"{label} [{key}]: {rendered}")
+        else:
+            rendered = _format_field_value(key, value)
+            lines.append(f"{label} [{key}]: {rendered}")
+
+    # ── PDF text ─────────────────────────────────────────────────
+    pdf_text = record.get("pdf_text")
+    if pdf_text and pdf_text not in ("", None):
+        lines += [
+            "",
+            "───────────────────────────────────────────────────────────",
+            "FULL PDF TEXT",
+            "───────────────────────────────────────────────────────────",
+            "",
+            str(pdf_text),
+        ]
+    else:
+        lines.append("PDF text [pdf_text]: not extracted")
+
+    # ── Tender / public procurement record ───────────────────────
+    if tender:
+        lines += [
+            "",
+            "═══════════════════════════════════════════════════════════",
+            "RELATED PUBLIC PROCUREMENT TENDER",
+            f"(matched via public_procurement_id = {record.get('public_procurement_id', '?')})",
+            "═══════════════════════════════════════════════════════════",
+            "",
+        ]
+        # Emit every top-level tender field with full detail
+        for key, value in tender.items():
+            if key == "documents":
+                # Full document listing
+                if isinstance(value, list) and value:
+                    lines.append(f"Tender documents ({len(value)} files):")
+                    for di, doc in enumerate(value, 1):
+                        lines.append(f"  Document {di}:")
+                        for dk, dv in doc.items():
+                            lines.append(f"    {dk}: {dv}")
+                else:
+                    lines.append("Tender documents: none")
+                continue
+            if key == "parts":
+                # Full parts listing with participants, pdf text, notes
+                if isinstance(value, list) and value:
+                    lines.append("")
+                    lines.append(f"TENDER PARTS ({len(value)} parts):")
+                    for part in value:
+                        pn = part.get("part_number", "?")
+                        lines.append(f"  ─── Part {pn} ───")
+                        for pk, pv in part.items():
+                            if pk == "document" and isinstance(pv, dict):
+                                lines.append(f"    Part document:")
+                                for ddk, ddv in pv.items():
+                                    lines.append(f"      {ddk}: {ddv}")
+                            elif pk == "participants" and isinstance(pv, list):
+                                lines.append(f"    Participants ({len(pv)}):")
+                                for pi, participant in enumerate(pv, 1):
+                                    if isinstance(participant, dict):
+                                        name = participant.get("name", "?")
+                                        ico = participant.get("ico", "?")
+                                        proposed = participant.get("proposed_sum", "?")
+                                        proposed_eur = participant.get("proposed_sum_eur", "?")
+                                        lines.append(
+                                            f"      {pi}. {name} (ICO: {ico}) "
+                                            f"— proposed: {proposed} ({proposed_eur} EUR)"
+                                        )
+                                        # Include any other participant fields
+                                        for ppk, ppv in participant.items():
+                                            if ppk not in ("name", "ico", "proposed_sum", "proposed_sum_eur"):
+                                                lines.append(f"         {ppk}: {ppv}")
+                                    else:
+                                        lines.append(f"      {pi}. {participant}")
+                            elif pk == "pdf_text" and pv:
+                                lines.append(f"    Part PDF text:")
+                                lines.append(f"    {pv}")
+                            elif pk == "notes" and pv:
+                                if isinstance(pv, list):
+                                    lines.append(f"    Notes ({len(pv)}):")
+                                    for note in pv:
+                                        lines.append(f"      - {note}")
+                                else:
+                                    lines.append(f"    Notes: {pv}")
+                            else:
+                                lines.append(f"    {pk}: {pv}")
+                        lines.append("")
+                else:
+                    lines.append("Tender parts: none")
+                continue
+            # All other scalar/simple tender fields
+            rendered = _format_field_value(key, value)
+            label = key.replace("_", " ").capitalize()
+            lines.append(f"{label} [{key}]: {rendered}")
+    else:
+        public_proc_id = record.get("public_procurement_id")
+        if public_proc_id:
+            lines += [
+                "",
+                f"Note: contract has public_procurement_id={public_proc_id} "
+                "but no matching tender record was found in tenders.json.",
+            ]
+
+    return "\n".join(lines)

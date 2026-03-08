@@ -42,7 +42,7 @@ from .chatbot.protocol import (
     ScopeRefusalData,
 )
 from .chatbot.llm import create_llm_client, MockLLMClient
-from .chatbot.context import build_scoped_context
+from .chatbot.context import build_scoped_context, build_contract_context
 from .chatbot.scope import check_scope
 from .chatbot.history import create_history
 from .chatbot.usage import UsageTracker
@@ -85,6 +85,21 @@ async def lifespan(app: FastAPI):
                 app.state.sub_store = sub_store
             except Exception:
                 logger.warning("Failed to load subcontractors data from %s", sub_path_str)
+
+    # Load tenders index (tender_id → tender record) for contract chatbot context
+    app.state.tenders = {}
+    tenders_path = Path(settings.data_path).parent / "tenders.json"
+    if tenders_path.exists():
+        try:
+            raw_tenders = json.loads(tenders_path.read_text(encoding="utf-8"))
+            app.state.tenders = {
+                str(t["tender_id"]): t
+                for t in raw_tenders
+                if "tender_id" in t
+            }
+            logger.info("Loaded %d tender records from %s", len(app.state.tenders), tenders_path)
+        except Exception:
+            logger.warning("Failed to load tenders from %s", tenders_path)
 
     yield
 
@@ -1444,6 +1459,7 @@ async def chat_websocket(websocket: WebSocket):
             message = data.get("message", "")
             session_id = data.get("session_id") or str(uuid.uuid4())
             filters_raw = data.get("filters") or {}
+            contract_id_ctx = data.get("contract_id") or None
 
             # Sanitise input (security)
             message = _sanitise_message(message)
@@ -1478,44 +1494,98 @@ async def chat_websocket(websocket: WebSocket):
             # Get the store
             store: DataStore = app.state.store
 
-            # Check scope
-            refusal = check_scope(message, filters, store)
-            if refusal:
-                done = DoneFrame(
-                    content=refusal.reason,
-                    scope_refusal=ScopeRefusalData(
-                        reason=refusal.reason,
-                        suggestions=refusal.suggestions,
-                        hint_endpoint=refusal.hint_endpoint,
-                    ),
+            # ── Contract-specific context mode ──────────────────────────
+            if contract_id_ctx:
+                # Find the contract
+                contract_obj = next(
+                    (c for c in store.contracts if c.contract_id == contract_id_ctx),
+                    None,
                 )
+                if contract_obj is None:
+                    await websocket.send_text(
+                        ErrorFrame(message=f"Contract {contract_id_ctx} not found").model_dump_json()
+                    )
+                    continue
+
+                # Find related tender via public_procurement_id
+                tender_data = None
+                tenders_index: Dict[str, Any] = getattr(app.state, "tenders", {})
+                contract_record = contract_obj.model_dump(exclude_none=False)
+                public_proc_id = str(contract_record.get("public_procurement_id") or "").strip()
+                if public_proc_id and public_proc_id in tenders_index:
+                    tender_data = tenders_index[public_proc_id]
+
+                context_str = build_contract_context(contract_obj, tender=tender_data)
+                system_prompt = context_str
+                provenance_docs = [
+                    {
+                        "id": contract_obj.contract_id or "",
+                        "title": contract_obj.contract_title or "(untitled)",
+                        "source": contract_obj.contract_url or "",
+                        "date": contract_obj.published_date or "",
+                    }
+                ]
+
+                history = _chat_history.get(session_id)
+                llm_messages = [{"role": "system", "content": system_prompt}]
+                for msg in history[-10:]:
+                    llm_messages.append(msg)
+                llm_messages.append({"role": "user", "content": message})
                 _chat_history.append(session_id, "user", message)
-                _chat_history.append(session_id, "assistant", refusal.reason)
-                await websocket.send_text(done.model_dump_json())
-                continue
 
-            # Build scoped context
-            context_str, provenance_docs = build_scoped_context(
-                filters, store
-            )
+            else:
+                # ── Filtered-scope context mode (dashboard) ──────────────
+                # Check scope
+                refusal = check_scope(message, filters, store)
+                if refusal:
+                    done = DoneFrame(
+                        content=refusal.reason,
+                        scope_refusal=ScopeRefusalData(
+                            reason=refusal.reason,
+                            suggestions=refusal.suggestions,
+                            hint_endpoint=refusal.hint_endpoint,
+                        ),
+                    )
+                    _chat_history.append(session_id, "user", message)
+                    _chat_history.append(session_id, "assistant", refusal.reason)
+                    await websocket.send_text(done.model_dump_json())
+                    continue
 
-            # Build messages for LLM
-            system_prompt = (
-                "You are GovLens Assistant. Follow the RULES in the context "
-                "strictly and answer only from the provided contracts. "
-                "If data is missing, state it explicitly. Keep answers useful, "
-                "analytical, and concise.\n\n"
-                f"{context_str}"
-            )
+                # Build scoped context
+                context_str, provenance_docs = build_scoped_context(
+                    filters, store
+                )
 
-            history = _chat_history.get(session_id)
-            llm_messages = [{"role": "system", "content": system_prompt}]
-            for msg in history[-10:]:  # last 10 messages for context
-                llm_messages.append(msg)
-            llm_messages.append({"role": "user", "content": message})
+                system_prompt = (
+                    "You are GovLens Assistant. Follow the RULES in the context "
+                    "strictly and answer only from the provided contracts. "
+                    "If data is missing, state it explicitly. Keep answers useful, "
+                    "analytical, and concise.\n\n"
+                    f"{context_str}"
+                )
 
-            # Store user message
-            _chat_history.append(session_id, "user", message)
+                history = _chat_history.get(session_id)
+                llm_messages = [{"role": "system", "content": system_prompt}]
+                for msg in history[-10:]:  # last 10 messages for context
+                    llm_messages.append(msg)
+                llm_messages.append({"role": "user", "content": message})
+
+                # Store user message
+                _chat_history.append(session_id, "user", message)
+
+            # Log full prompt to server console for debugging
+            logger.info("[CHAT] session=%s contract_id=%s user=%r", session_id, contract_id_ctx, message)
+            print(f"\n{'═'*72}")
+            print(f"[CHAT] session={session_id}  contract_id={contract_id_ctx}")
+            for m in llm_messages:
+                print(f"\n--- {m['role'].upper()} ({len(m['content'])} chars) ---")
+                # Print first 2000 chars of system prompt, full for other roles
+                if m['role'] == 'system' and len(m['content']) > 2000:
+                    print(m['content'][:2000])
+                    print(f"... [{len(m['content']) - 2000} more chars]")
+                else:
+                    print(m['content'])
+            print(f"{'═'*72}\n", flush=True)
 
             # Stream response
             collected_tokens: List[str] = []

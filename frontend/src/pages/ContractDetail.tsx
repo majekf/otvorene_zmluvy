@@ -10,6 +10,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import type { Contract } from '../types';
 import { fetchContract } from '../api';
 import { formatEur, formatDate } from '../utils';
+import ChatBar from '../components/ChatBar';
 
 export default function ContractDetail() {
   const { id } = useParams<{ id: string }>();
@@ -151,6 +152,9 @@ export default function ContractDetail() {
           </div>
         )}
       </div>
+
+      {/* Contract-scoped chatbot */}
+      <ChatBar filters={{}} contractId={contract.contract_id ?? undefined} />
     </div>
   );
 }
