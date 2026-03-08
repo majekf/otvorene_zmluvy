@@ -18,6 +18,10 @@ const mockInstitutionRankings = {
     { rank: 2, institution: 'Second Ministry', value: 3000000 },
     { rank: 3, institution: 'Third Ministry', value: 1000000 },
   ],
+  total: 3,
+  page: 1,
+  page_size: 20,
+  total_pages: 1,
 };
 
 const mockVendorRankings = {
@@ -27,12 +31,34 @@ const mockVendorRankings = {
     { rank: 1, vendor: 'Big Vendor', value: 4000000 },
     { rank: 2, vendor: 'Small Vendor', value: 1000000 },
   ],
+  total: 2,
+  page: 1,
+  page_size: 20,
+  total_pages: 1,
 };
 
 const emptyRankings = {
   entity: 'institutions',
   metric: 'total_spend',
   rankings: [],
+  total: 0,
+  page: 1,
+  page_size: 20,
+  total_pages: 0,
+};
+
+const mockPaginatedRankings = {
+  entity: 'institutions',
+  metric: 'total_spend',
+  rankings: Array.from({ length: 20 }, (_, i) => ({
+    rank: i + 1,
+    institution: `Ministry ${i + 1}`,
+    value: (25 - i) * 100000,
+  })),
+  total: 25,
+  page: 1,
+  page_size: 20,
+  total_pages: 2,
 };
 
 function renderPage(route = '/rankings') {
@@ -120,6 +146,8 @@ describe('GlobalView', () => {
         'institutions',
         'contract_count',
         expect.anything(),
+        1,
+        20,
       );
     });
   });
@@ -138,6 +166,69 @@ describe('GlobalView', () => {
     await waitFor(() => {
       expect(screen.getByTestId('global-summary')).toBeInTheDocument();
       expect(screen.getByText(/3 institutions/)).toBeInTheDocument();
+    });
+  });
+
+  it('does not show pagination when all results fit on one page', async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('rankings-table')).toBeInTheDocument();
+    });
+    // Pagination component returns null when totalPages <= 1
+    expect(screen.queryByTestId('pagination')).not.toBeInTheDocument();
+  });
+
+  it('shows pagination when there are multiple pages', async () => {
+    vi.mocked(api.fetchRankings).mockResolvedValue(mockPaginatedRankings);
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('rankings-table')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('pagination')).toBeInTheDocument();
+  });
+
+  it('fetches next page when pagination next is clicked', async () => {
+    vi.mocked(api.fetchRankings).mockResolvedValue(mockPaginatedRankings);
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('pagination')).toBeInTheDocument();
+    });
+
+    vi.mocked(api.fetchRankings).mockClear();
+    fireEvent.click(screen.getByTestId('page-next'));
+
+    await waitFor(() => {
+      expect(api.fetchRankings).toHaveBeenCalledWith(
+        'institutions',
+        'total_spend',
+        expect.anything(),
+        2,
+        20,
+      );
+    });
+  });
+
+  it('resets to page 1 when metric changes', async () => {
+    vi.mocked(api.fetchRankings).mockResolvedValue(mockPaginatedRankings);
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('pagination')).toBeInTheDocument();
+    });
+    // Navigate to page 2
+    fireEvent.click(screen.getByTestId('page-next'));
+    await waitFor(() => {
+      expect(api.fetchRankings).toHaveBeenCalledWith(
+        expect.anything(), expect.anything(), expect.anything(), 2, 20,
+      );
+    });
+
+    // Change metric — page should reset to 1
+    vi.mocked(api.fetchRankings).mockClear();
+    fireEvent.click(screen.getByTestId('metric-contract_count'));
+    await waitFor(() => {
+      expect(api.fetchRankings).toHaveBeenCalledWith(
+        'institutions', 'contract_count', expect.anything(), 1, 20,
+      );
     });
   });
 });

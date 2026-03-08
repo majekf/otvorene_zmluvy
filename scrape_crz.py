@@ -49,6 +49,28 @@ Examples:
         default=None,
         help="Maximum number of contracts/files to scrape across all pages (optional)"
     )
+
+    parser.add_argument(
+        "--crz-listing-url",
+        type=str,
+        default=None,
+        help="Custom CRZ listing URL (optional, default uses /zmluvy/)"
+    )
+
+    parser.add_argument("--crz-art-zs2", type=str, default=None)
+    parser.add_argument("--crz-art-predmet", type=str, default=None)
+    parser.add_argument("--crz-art-ico", type=str, default=None)
+    parser.add_argument("--crz-art-suma-spolu-od", type=str, default=None)
+    parser.add_argument("--crz-art-suma-spolu-do", type=str, default=None)
+    parser.add_argument("--crz-art-datum-zverejnene-od", type=str, default=None)
+    parser.add_argument("--crz-art-datum-zverejnene-do", type=str, default=None)
+    parser.add_argument("--crz-art-rezort", type=str, default=None)
+    parser.add_argument("--crz-art-zs1", type=str, default=None)
+    parser.add_argument("--crz-nazov", type=str, default=None)
+    parser.add_argument("--crz-art-ico1", type=str, default=None)
+    parser.add_argument("--crz-odoslat", type=str, default=None)
+    parser.add_argument("--crz-id", type=str, default=None)
+    parser.add_argument("--crz-frm-id-frm-filter-3", type=str, default=None)
     
     parser.add_argument(
         "--out",
@@ -127,6 +149,13 @@ Examples:
         default="slk+eng",
         help="Tesseract OCR language(s), e.g. 'slk+eng' (default: slk+eng)"
     )
+
+    parser.add_argument(
+        "--ocr-workers",
+        type=int,
+        default=2,
+        help="Number of background PDF text extraction workers (includes OCR fallback, default: 2)"
+    )
     
     args = parser.parse_args()
     
@@ -141,14 +170,33 @@ Examples:
     logger.info(f"  Start page: {args.start_page}")
     logger.info(f"  Max pages: {args.max_pages}")
     logger.info(f"  Max contracts: {args.max_contracts}")
+    logger.info(f"  CRZ listing URL override: {args.crz_listing_url}")
     logger.info(f"  Output: {args.out}")
     logger.info(f"  Delay: {args.delay}s")
     logger.info(f"  Min price: {args.min_price}")
     logger.info(f"  Max price: {args.max_price}")
     logger.info(f"  PDF dir: {args.pdf_dir}")
     logger.info(f"  OCR JSON mode: {bool(args.ocr_json)}")
+    logger.info(f"  OCR workers: {args.ocr_workers}")
     
     try:
+        crz_filters = {
+            "art_zs2": args.crz_art_zs2,
+            "art_predmet": args.crz_art_predmet,
+            "art_ico": args.crz_art_ico,
+            "art_suma_spolu_od": args.crz_art_suma_spolu_od,
+            "art_suma_spolu_do": args.crz_art_suma_spolu_do,
+            "art_datum_zverejnene_od": args.crz_art_datum_zverejnene_od,
+            "art_datum_zverejnene_do": args.crz_art_datum_zverejnene_do,
+            "art_rezort": args.crz_art_rezort,
+            "art_zs1": args.crz_art_zs1,
+            "nazov": args.crz_nazov,
+            "art_ico1": args.crz_art_ico1,
+            "odoslat": args.crz_odoslat,
+            "ID": args.crz_id,
+            "frm_id_frm_filter_3": args.crz_frm_id_frm_filter_3,
+        }
+
         if args.ocr_json:
             stats = enrich_json_with_ocr_text(
                 input_json_path=args.ocr_json,
@@ -170,12 +218,15 @@ Examples:
             start_page=args.start_page,
             max_pages=args.max_pages,
             max_contracts=args.max_contracts,
+            listing_url=args.crz_listing_url or "https://www.crz.gov.sk/zmluvy/",
+            crz_filters=crz_filters,
             output_file=args.out,
             delay=args.delay,
             min_price=args.min_price,
             max_price=args.max_price,
             user_agent=args.user_agent,
             pdf_dir=args.pdf_dir,
+            ocr_workers=args.ocr_workers,
         )
         
         logger.info(f"Success! Scraped {contracts_count} contracts to {args.out}")

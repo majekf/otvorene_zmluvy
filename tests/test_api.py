@@ -354,6 +354,68 @@ class TestRankings:
         assert data["rankings"][0]["vendor"] == "STRABAG s.r.o."
 
 
+class TestRankingsPagination:
+    """Tests for pagination support on /api/rankings endpoint."""
+
+    def test_rankings_response_has_pagination_metadata(self, client):
+        """Response includes total, page, page_size, total_pages fields."""
+        r = client.get("/api/rankings", params={"entity": "institutions"})
+        assert r.status_code == 200
+        data = r.json()
+        assert "total" in data
+        assert "page" in data
+        assert "page_size" in data
+        assert "total_pages" in data
+        assert data["page"] == 1
+        assert data["page_size"] == 20
+
+    def test_rankings_pagination_limits_results(self, client):
+        """page_size=2 returns only 2 records on page 1."""
+        r = client.get(
+            "/api/rankings",
+            params={"entity": "institutions", "metric": "total_spend", "page_size": 2},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert len(data["rankings"]) == 2
+        assert data["total"] == 3  # 3 institutions in test fixture
+        assert data["page_size"] == 2
+        assert data["total_pages"] == 2
+        # First page still returns rank 1
+        assert data["rankings"][0]["rank"] == 1
+
+    def test_rankings_pagination_page_2(self, client):
+        """page=2 with page_size=2 returns the 3rd institution."""
+        r = client.get(
+            "/api/rankings",
+            params={"entity": "institutions", "metric": "total_spend", "page_size": 2, "page": 2},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert len(data["rankings"]) == 1
+        assert data["page"] == 2
+        # Rank numbers are global (rank 3 is on page 2)
+        assert data["rankings"][0]["rank"] == 3
+
+    def test_rankings_pagination_beyond_last_page_returns_empty(self, client):
+        """Requesting a page beyond the last returns empty rankings."""
+        r = client.get(
+            "/api/rankings",
+            params={"entity": "institutions", "page": 99, "page_size": 20},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data["rankings"] == []
+        assert data["total"] == 3
+
+    def test_rankings_default_page_size_is_20(self, client):
+        """Default page_size is 20 — all 3 test-fixture institutions fit on page 1."""
+        r = client.get("/api/rankings", params={"entity": "institutions"})
+        data = r.json()
+        assert data["page_size"] == 20
+        assert len(data["rankings"]) == 3  # all 3 fit
+
+
 # ── Institutions ─────────────────────────────────────────────────────
 
 
@@ -542,7 +604,7 @@ class TestFilterState:
 
 
 class TestSampleDataSmoke:
-    """Smoke tests using the real sample_contracts.json."""
+    """Smoke tests using the real test_data.json."""
 
     @pytest.fixture
     def sample_client(self):
@@ -550,9 +612,8 @@ class TestSampleDataSmoke:
         import os
 
         data_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "data",
-            "sample_contracts.json",
+            os.path.dirname(__file__),
+            "test_data.json",
         )
         ds = DataStore(data_path)
         app.dependency_overrides[get_store] = lambda: ds
@@ -957,3 +1018,134 @@ class TestRankingsEnhanced:
         assert "T-Systems Slovakia s.r.o." in vendors
         # SecurCorp only serves Ministerstvo
         assert "SecurCorp a.s." not in vendors
+
+
+class TestBenchmarkWithFilters:
+    """Tests for benchmark endpoints with global filter support."""
+
+    def test_benchmark_compare_with_date_filter(self, client):
+        """Benchmark compare respects date_from filter."""
+        # Only contracts from 2026 onward (1003=200k Košice, 1004=750k Ministerstvo, 1005=300k Košice)
+        r = client.get(
+            "/api/benchmark/compare",
+            params={
+                "institutions": "Mesto Bratislava|Mesto Košice",
+                "metrics": "total_spend,contract_count",
+                "date_from": "2026-01-01",
+            },
+        )
+        assert r.status_code == 200
+        data = r.json()
+        ba = next(r for r in data["results"] if r["institution"] == "Mesto Bratislava")
+        ke = next(r for r in data["results"] if r["institution"] == "Mesto Košice")
+        # Bratislava has no contracts from 2026 onward
+        assert ba["total_spend"] == 0
+        assert ba["contract_count"] == 0
+        # Košice has 1003 + 1005
+        assert ke["total_spend"] == 500_000
+        assert ke["contract_count"] == 2
+
+    def test_benchmark_compare_with_category_filter(self, client):
+        """Benchmark compare respects category filter."""
+        r = client.get(
+            "/api/benchmark/compare",
+            params={
+                "institutions": "Mesto Bratislava|Mesto Košice",
+                "metrics": "total_spend",
+                "categories": "construction",
+            },
+        )
+        assert r.status_code == 200
+        data = r.json()
+        ba = next(r for r in data["results"] if r["institution"] == "Mesto Bratislava")
+        ke = next(r for r in data["results"] if r["institution"] == "Mesto Košice")
+        # Bratislava has 1 construction contract (1001=1M)
+        assert ba["total_spend"] == 1_000_000
+        # Košice has 1 construction contract (1005=300k)
+        assert ke["total_spend"] == 300_000
+
+    def test_benchmark_compare_without_filter(self, client):
+        """Benchmark compare without filters uses all contracts (backwards compatible)."""
+        r = client.get(
+            "/api/benchmark/compare",
+            params={
+                "institutions": "Mesto Bratislava|Mesto Košice",
+                "metrics": "total_spend",
+            },
+        )
+        assert r.status_code == 200
+        data = r.json()
+        ba = next(r for r in data["results"] if r["institution"] == "Mesto Bratislava")
+        assert ba["total_spend"] == 1_500_000
+
+    def test_benchmark_endpoint_with_category_filter(self, client):
+        """Single-metric benchmark endpoint respects category filter."""
+        r = client.get(
+            "/api/benchmark",
+            params={
+                "institutions": "Mesto Bratislava|Mesto Košice",
+                "metric": "total_spend",
+                "categories": "construction",
+            },
+        )
+        assert r.status_code == 200
+        data = r.json()
+        ba = next(r for r in data["results"] if r["institution"] == "Mesto Bratislava")
+        assert ba["value"] == 1_000_000
+
+    def test_benchmark_peers_with_date_filter(self, client):
+        """Peer group respects date filter."""
+        # Only 2026 contracts: Košice has 2, Ministerstvo has 1
+        r = client.get(
+            "/api/benchmark/peers",
+            params={
+                "institution": "Mesto Košice",
+                "min_contracts": 1,
+                "date_from": "2026-01-01",
+            },
+        )
+        assert r.status_code == 200
+        data = r.json()
+        # Ministerstvo has 1 contract in 2026
+        assert "Ministerstvo vnútra SR" in data["peers"]
+        # Bratislava has 0 contracts in 2026
+        assert "Mesto Bratislava" not in data["peers"]
+
+    def test_benchmark_peers_with_category_filter(self, client):
+        """Peer group respects category filter."""
+        r = client.get(
+            "/api/benchmark/peers",
+            params={
+                "institution": "Mesto Bratislava",
+                "min_contracts": 1,
+                "categories": "construction",
+            },
+        )
+        assert r.status_code == 200
+        data = r.json()
+        # Košice has construction contract (1005)
+        assert "Mesto Košice" in data["peers"]
+        # Ministerstvo has no construction contracts
+        assert "Ministerstvo vnútra SR" not in data["peers"]
+
+    def test_benchmark_compare_with_value_range_filter(self, client):
+        """Benchmark compare respects value_min and value_max filters."""
+        # Only contracts >= 500k: 1001=1M, 1002=500k, 1004=750k
+        r = client.get(
+            "/api/benchmark/compare",
+            params={
+                "institutions": "Mesto Bratislava|Mesto Košice",
+                "metrics": "total_spend,contract_count",
+                "value_min": "500000",
+            },
+        )
+        assert r.status_code == 200
+        data = r.json()
+        ba = next(r for r in data["results"] if r["institution"] == "Mesto Bratislava")
+        ke = next(r for r in data["results"] if r["institution"] == "Mesto Košice")
+        # Bratislava: 1001(1M) + 1002(500k)
+        assert ba["total_spend"] == 1_500_000
+        assert ba["contract_count"] == 2
+        # Košice: no contracts >= 500k
+        assert ke["total_spend"] == 0
+        assert ke["contract_count"] == 0

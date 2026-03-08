@@ -234,9 +234,9 @@ class TestVendorModel:
 
 
 class TestSampleContractsFile:
-    """Validate that data/sample_contracts.json is well-formed."""
+    """Validate that tests/test_data.json is well-formed."""
 
-    SAMPLE_PATH = Path(__file__).parent.parent / "data" / "sample_contracts.json"
+    SAMPLE_PATH = Path(__file__).parent / "test_data.json"
 
     def test_file_exists(self):
         assert self.SAMPLE_PATH.exists(), f"{self.SAMPLE_PATH} not found"

@@ -416,12 +416,17 @@ class DataStore:
 
     # ── Benchmark / Peer Comparison ──────────────────────────────────
 
-    def institutions(self) -> List[Institution]:
+    def institutions(
+        self, contracts: Optional[List[Contract]] = None,
+    ) -> List[Institution]:
         """
         Return a list of all unique institutions (buyers) with their
         contract counts and total spend.
+
+        Args:
+            contracts: Subset to analyse; defaults to all.
         """
-        groups = self.group_by("buyer")
+        groups = self.group_by("buyer", contracts)
         result: List[Institution] = []
 
         for name, group_contracts in groups.items():
@@ -456,6 +461,7 @@ class DataStore:
         self,
         institution_names: List[str],
         metric: str = "total_spend",
+        contracts: Optional[List[Contract]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Compare institutions on a metric.
@@ -464,15 +470,17 @@ class DataStore:
             institution_names: List of buyer names to compare.
             metric: One of 'total_spend', 'contract_count', 'avg_value',
                     'max_value', 'direct_award_rate'.
+            contracts: Subset to analyse; defaults to all.
 
         Returns:
             List of dicts with 'institution', 'value' keys, sorted desc.
         """
+        pool = contracts if contracts is not None else self._contracts
         results: List[Dict[str, Any]] = []
 
         for name in institution_names:
             inst_contracts = [
-                c for c in self._contracts if c.buyer == name
+                c for c in pool if c.buyer == name
             ]
             if metric == "direct_award_rate":
                 value = self.direct_award_rate(inst_contracts)
@@ -732,6 +740,7 @@ class DataStore:
         self,
         institution_names: List[str],
         metrics: List[str],
+        contracts: Optional[List[Contract]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Compare institutions across multiple metrics.
@@ -739,14 +748,16 @@ class DataStore:
         Args:
             institution_names: List of buyer names.
             metrics: List of metric names.
+            contracts: Subset to analyse; defaults to all.
 
         Returns:
             List of dicts with 'institution' and a key per metric.
         """
+        pool = contracts if contracts is not None else self._contracts
         results: List[Dict[str, Any]] = []
         for name in institution_names:
             inst_contracts = [
-                c for c in self._contracts if c.buyer == name
+                c for c in pool if c.buyer == name
             ]
             stats = self.aggregate(inst_contracts)
             row: Dict[str, Any] = {"institution": name}
@@ -766,12 +777,31 @@ class DataStore:
         self,
         institution_name: str,
         min_contracts: int = 1,
+        contracts: Optional[List[Contract]] = None,
     ) -> List[str]:
         """
         Build a peer group: institutions with at least ``min_contracts``.
 
+        Args:
+            contracts: Subset to analyse; defaults to all.
+
         Returns names sorted by total spend, excluding the target institution.
         """
+        if contracts is not None:
+            # Build institution stats from the given contract subset
+            groups: Dict[str, List[Contract]] = defaultdict(list)
+            for c in contracts:
+                if c.buyer:
+                    groups[c.buyer].append(c)
+            result: List[Tuple[str, float]] = []
+            for name, grp in groups.items():
+                if name == institution_name:
+                    continue
+                if len(grp) >= min_contracts:
+                    stats = self.aggregate(grp)
+                    result.append((name, stats["total_spend"]))
+            result.sort(key=lambda t: t[1], reverse=True)
+            return [name for name, _ in result]
         all_inst = self.institutions()
         return [
             inst.name

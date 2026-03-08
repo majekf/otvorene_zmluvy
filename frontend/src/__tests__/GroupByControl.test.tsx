@@ -27,4 +27,11 @@ describe('GroupByControl', () => {
     fireEvent.click(screen.getByText('Institution'));
     expect(onChange).toHaveBeenCalledWith('buyer');
   });
+
+  it('renders options in the correct order: Vendor, Institution, Category, Month, Award Type', () => {
+    render(<GroupByControl value="category" onChange={vi.fn()} />);
+    const buttons = screen.getAllByRole('button');
+    const labels = buttons.map((btn) => btn.textContent);
+    expect(labels).toEqual(['Vendor', 'Institution', 'Category', 'Month', 'Award Type']);
+  });
 });

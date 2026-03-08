@@ -21,7 +21,7 @@
 | **Price parsing** | ✅ Complete | Slovak format `28 978,27 €` → `28978.27` with NBSP handling |
 | **Date parsing** | ✅ Complete | Slovak month names → ISO, DD.MM.YYYY → ISO |
 | **PDF download + text extraction** | ✅ Complete | primary extraction via `pdfplumber` (truncated at 50 000 chars) with OCR fallback for scanned PDFs using `pypdfium2` + `tesseract` |
-| **Unit tests** | ✅ Complete | 341 backend (+ 1 skipped) + 135 frontend tests — `test_parser.py` (prices, dates), `test_integration.py` (scraper smoke), `test_models.py` (Phase 0, 24 tests), `test_migrate.py` (Phase 0, 15 tests), `test_engine.py` (Phase 1 + 6, 95 tests), `test_api.py` (Phase 2 + 6, 46 tests), `test_rules.py` (Phase 4, 37 tests), `test_chatbot.py` (Phase 5, 49 passed + 1 skipped), `test_workspace.py` (Phase 7, 5 tests), `test_export.py` (Phase 7, 5 tests), `test_url_state.py` (Phase 7, 5 tests), `test_e2e.py` (Phase 8, 15 tests), `test_performance.py` (Phase 8, 14 tests); 20 frontend test files (135 tests via vitest) including Phase 6 pages and Phase 7 WorkspaceToolbar. The skipped tests require `OPENAI_API_KEY` or a live Redis server — they are marked `@requires_openai_key` / `@requires_redis` and report SKIPPED when the service is absent. |
+| **Unit tests** | ✅ Complete | 363 backend (+ 1 skipped) + 209 frontend tests — `test_parser.py` (prices, dates), `test_integration.py` (scraper smoke), `test_models.py` (Phase 0, 24 tests), `test_migrate.py` (Phase 0, 15 tests), `test_engine.py` (Phase 1 + 6, 95 tests), `test_api.py` (Phase 2 + 6, 68 tests), `test_rules.py` (Phase 4, 37 tests), `test_chatbot.py` (Phase 5, 49 passed + 1 skipped), `test_workspace.py` (Phase 7, 5 tests), `test_export.py` (Phase 7, 5 tests), `test_url_state.py` (Phase 7, 5 tests), `test_e2e.py` (Phase 8, 15 tests), `test_performance.py` (Phase 8, 14 tests); 24 frontend test files (209 tests via vitest) including Phase 6 pages (BenchmarkView with 13 FilterBar integration tests, GlobalView with 13 tests including 4 pagination tests) and Phase 7 WorkspaceToolbar. The skipped tests require `OPENAI_API_KEY` or a live Redis server — they are marked `@requires_openai_key` / `@requires_redis` and report SKIPPED when the service is absent. |
 | **Documentation** | ✅ Complete | README, ARCHITECTURE, QUICKSTART, START_HERE, PROJECT_COMPLETION, DELIVERY_SUMMARY, INDEX — all updated for Phase 0 and Phase 1 |
 | **Dependencies** | ✅ Pinned | `requirements.in` / `requirements.txt` — requests, beautifulsoup4, lxml, pdfplumber, pytest, pydantic>=2.0, python-dotenv, fastapi, uvicorn[standard], httpx, reportlab |
 | **Output format** | ✅ NDJSON | One JSON object per line; fields: listing, detail, PDF, `scraped_at`, `category`, `pdf_text_summary`, `award_type` |
@@ -528,6 +528,11 @@ Tests that require external services or API keys are decorated with conditional 
 | 6.7 | **Global Ranking Mode** — Backend: `GET /api/rankings` enhanced with metric selector (total spend, top-N concentration, fragmentation score, direct award rate) | ✅ DONE |
 | 6.8 | Global Ranking Mode — Frontend: `GlobalView` page: sortable ranking table; click-through to institution/vendor profiles | ✅ DONE |
 | 6.9 | All modes share the same `FilterBar` component and URL-state | ✅ DONE |
+| 6.14 | **Global Ranking Mode** — Pagination: `GET /api/rankings` now accepts `page` / `page_size` query params (default: page 1, page_size 20); response includes `total`, `page`, `page_size`, `total_pages`; `fetchRankings` forwards `page`/`pageSize`; `GlobalView` shows `<Pagination>` when results exceed one page, resets to page 1 on entity/metric/filter change, syncs `page` to URL | ✅ DONE |
+| 6.10 | **Benchmark Mode** — Integrate shared `FilterBar` into `BenchmarkView` via `FilterContext`; global filters (date range, category, vendor, value range, award type, text search) persist across tab navigation and restrict benchmark API data | ✅ DONE |
+| 6.11 | **Benchmark Mode** — Backend: add `parse_filters` support to `/api/benchmark`, `/api/benchmark/peers`, and `/api/benchmark/compare` endpoints; engine methods (`compare`, `compare_multi_metric`, `peer_group`) accept optional `contracts` parameter for pre-filtered subsets | ✅ DONE |
+| 6.12 | **Benchmark Mode** — Frontend API: `fetchBenchmark`, `fetchBenchmarkPeers`, `fetchBenchmarkMultiMetric` now accept and forward `FilterState` to the backend | ✅ DONE |
+| 6.13 | **Benchmark Mode** — Filter-dependent institution selector: backend `institutions()` accepts optional `contracts` param, `/api/institutions` endpoint uses `parse_filters`, `fetchInstitutions` forwards `FilterState`, `BenchmarkView` re-fetches institution list on filter change and auto-deselects removed institutions | ✅ DONE |
 
 #### Unit Tests for Phase 6
 
@@ -540,11 +545,13 @@ Tests that require external services or API keys are decorated with conditional 
 | `test_engine.py::TestTrendMultiMetric` (3 tests) | Multi-metric trend generation | ✅ PASS |
 | `test_api.py::TestBenchmarkPeerGroup` (3 tests) | `/api/benchmark/peers` endpoint | ✅ PASS |
 | `test_api.py::TestBenchmarkMultiMetric` (2 tests) | `/api/benchmark/compare` endpoint | ✅ PASS |
+| `test_api.py::TestBenchmarkWithFilters` (8 tests) | `/api/benchmark`, `/api/benchmark/compare`, `/api/benchmark/peers` with global filters (date range, category, value range) | ✅ PASS |
 | `test_api.py::TestTrendsEnhanced` (3 tests) | Enhanced `/api/trends` with overlay dates and multi-metric | ✅ PASS |
+| `test_api.py::TestRankingsPagination` (5 tests) | Pagination metadata in response, page_size limits results, page 2 returns correct slice, beyond-last-page returns empty, default page_size is 20 | ✅ PASS |
 | `test_api.py::TestRankingsEnhanced` (5 tests) | Enhanced `/api/rankings` with filters and new metrics | ✅ PASS |
-| `BenchmarkView.test.tsx` (6 tests) | Renders institutions, peer suggestions, comparison charts, min-contracts filter | ✅ PASS |
+| `BenchmarkView.test.tsx` (15 tests) | Renders institutions, peer suggestions, comparison charts, min-contracts filter, FilterBar integration, filter state persistence, filters passed to API calls, filter-dependent institution list, auto-deselection on filter change | ✅ PASS |
 | `TimeView.test.tsx` (8 tests) | Loading/empty/chart states, granularity toggle, metric toggle, overlay toggle | ✅ PASS |
-| `GlobalView.test.tsx` (9 tests) | Loading/empty/table states, entity toggle, metric selector, rank rows, summary | ✅ PASS |
+| `GlobalView.test.tsx` (13 tests) | Loading/empty/table states, entity toggle, metric selector, rank rows, summary, pagination absent when single page, pagination visible when multiple pages, next-page fetch, page reset on metric change | ✅ PASS |
 | `App.test.tsx` (5 new tests) | Routes: /benchmark, /time, /rankings; navigation links | ✅ PASS |
 
 #### Unlocks
@@ -638,6 +645,73 @@ Tests that require external services or API keys are decorated with conditional 
 
 ---
 
+### Phase 9 — Contracts vs Subcontractors Comparison
+
+**Goal:** Add a second data source (subcontractors) and a clustered bar chart comparison view, allowing users to compare aggregated metrics from the primary contracts dataset against the subcontractors dataset side-by-side.
+
+**Status: ✅ COMPLETE**
+
+**Dependencies:** Phase 2 (API), Phase 3 (Frontend UI), Phase 6 (Investigation Modes — FilterBar, GroupByControl, WorkspaceToolbar).
+
+#### Design Decision: Data Transformation vs Engine Abstraction
+
+The assistant initially proposed adding a `vendor_field` parameter throughout the engine (group_by, top_n_vendors, vendors, filter). This approach was **rejected** because:
+- It modifies core methods used by all existing functionality, risking regressions.
+- It adds complexity to well-tested code paths for a single use case.
+
+**Chosen approach: Data transformation at load time.** The subcontractors JSON has both `supplier`/`ico_supplier` (original supplier) and `subcontractor`/`ico_subcontractor` fields. During startup, the `subcontractor` → `supplier` and `ico_subcontractor` → `ico_supplier` fields are remapped, so the existing DataStore engine works identically on the transformed data with **zero changes to the engine**.
+
+#### Tasks
+
+| # | Task | Status |
+|---|------|--------|
+| 9.1 | Add `GOVLENS_SUBCONTRACTORS_DATA_PATH` to `src/config.py` Settings | ✅ DONE |
+| 9.2 | Load second DataStore (`sub_store`) in `api.py` lifespan with field remapping (`subcontractor` → `supplier`, `ico_subcontractor` → `ico_supplier`) | ✅ DONE |
+| 9.3 | Add `get_sub_store()` dependency in `api.py` | ✅ DONE |
+| 9.4 | Create `GET /api/compare/aggregations` endpoint — runs `aggregate_groups` on both stores, merges into clustered data | ✅ DONE |
+| 9.5 | Add `CompareAggregationRow` and `CompareAggregationsResponse` types to `frontend/src/types.ts` | ✅ DONE |
+| 9.6 | Add `fetchCompareAggregations()` to `frontend/src/api.ts` | ✅ DONE |
+| 9.7 | Create `ClusteredBarChart.tsx` component — Recharts clustered horizontal bar chart with two bars per group | ✅ DONE |
+| 9.8 | Create `CompareView.tsx` page — filters, group-by, metric selector, summary cards, clustered chart | ✅ DONE |
+| 9.9 | Add `/compare` route and "Compare" nav link in `App.tsx` | ✅ DONE |
+| 9.10 | Update `.env.example` and `docker-compose.yml` with new env variable | ✅ DONE |
+| 9.11 | Backend tests: `tests/test_compare.py` — 19 tests (response shape, filter pass-through, no-sub-store fallback, data transformation) | ✅ DONE |
+| 9.12 | Frontend tests: `ClusteredBarChart.test.tsx` (5 tests), `CompareView.test.tsx` (6 tests) | ✅ DONE |
+
+#### Unit Tests for Phase 9
+
+- `tests/test_compare.py::TestCompareAggregations` (12 tests) — endpoint 200, response shape, group-by variants, filter pass-through, date filter, sort order, merged groups
+- `tests/test_compare.py::TestCompareNoSubStore` (4 tests) — graceful fallback when sub_store is None, has_subcontractors flag, zeroed summaries
+- `tests/test_compare.py::TestSubStoreDataTransformation` (3 tests) — field remapping correctness, field preservation, engine aggregation with remapped vendors
+- `frontend/src/__tests__/ClusteredBarChart.test.tsx` (5 tests) — render, empty data, metric variants, custom labels
+- `frontend/src/__tests__/CompareView.test.tsx` (6 tests) — page render, data loading, metric switching, no-sub warning, API call verification
+
+**Total: 30 new tests (19 backend + 11 frontend)**
+
+#### Files Changed
+
+| File | Change |
+|------|--------|
+| `src/config.py` | Added `subcontractors_data_path` setting |
+| `src/api.py` | Extended lifespan with sub_store loading, added `get_sub_store()`, added `/api/compare/aggregations` endpoint |
+| `frontend/src/types.ts` | Added `CompareAggregationRow`, `CompareAggregationsResponse` interfaces |
+| `frontend/src/api.ts` | Added `fetchCompareAggregations()` |
+| `frontend/src/components/ClusteredBarChart.tsx` | **NEW** — Recharts clustered bar chart component |
+| `frontend/src/pages/CompareView.tsx` | **NEW** — Comparison page with filters, metrics, summary cards |
+| `frontend/src/App.tsx` | Added CompareView import, route `/compare`, and nav link |
+| `.env.example` | Added `GOVLENS_SUBCONTRACTORS_DATA_PATH` |
+| `docker-compose.yml` | Added `GOVLENS_SUBCONTRACTORS_DATA_PATH` env var |
+| `tests/test_compare.py` | **NEW** — 19 backend tests |
+| `frontend/src/__tests__/ClusteredBarChart.test.tsx` | **NEW** — 5 component tests |
+| `frontend/src/__tests__/CompareView.test.tsx` | **NEW** — 6 page tests |
+
+#### Unlocks
+
+- Side-by-side comparison of contracts vs subcontractors across all existing grouping dimensions.
+- Foundation for additional multi-source analysis features.
+
+---
+
 ## 3 — FINAL SUMMARY
 
 ### 3.1 Full Dependency Map
@@ -664,6 +738,7 @@ Phase 0: Foundation (Schema, Data Model, Restructure)
    └──► All phases depend on Phase 0
 
 Phase 8: Polish & Deployment ← depends on ALL prior phases
+Phase 9: Compare (Contracts vs Subcontractors) ← depends on Phase 2, 3, 6
 ```
 
 ### 3.2 Recommended Implementation Order
@@ -679,6 +754,7 @@ Phase 8: Polish & Deployment ← depends on ALL prior phases
 | 7th | **Phase 6** — Investigation Modes | 3–4 days | ✅ **COMPLETE** | Extends existing UI infrastructure |
 | 8th | **Phase 7** — State & Export | 2–3 days | ✅ **COMPLETE** | Polishes the experience; depends on stable views |
 | 9th | **Phase 8** — Polish & Deploy | 2–3 days | ✅ **COMPLETE** | Final pass |
+| 10th | **Phase 9** — Compare (Contracts vs Subcontractors) | 1–2 days | ✅ **COMPLETE** | Second data source + clustered chart |
 
 **Total estimated effort: 24–35 working days | Completed: ~24–35 days (All phases complete)**
 

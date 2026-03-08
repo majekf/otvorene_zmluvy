@@ -13,13 +13,15 @@ import os
 import re
 import shutil
 import subprocess
+import threading
 import time
 import unicodedata
+from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Dict, List, Optional
-from urllib.parse import urljoin, urlparse
+from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
 import pdfplumber
 import pypdfium2 as pdfium
@@ -47,6 +49,10 @@ DEFAULT_TIMEOUT = 10
 DEFAULT_DELAY = 3.0  # seconds between requests
 MAX_RETRIES = 3
 RETRY_BACKOFF = 1.5  # exponential backoff multiplier
+
+# pypdfium2/tesseract OCR fallback is not reliably thread-safe under high
+# parallelism in this environment. Serialize OCR calls to avoid native crashes.
+OCR_LOCK = threading.Lock()
 
 # Month name mapping (normalized Slovak month names to number)
 MONTH_MAP = {
@@ -116,6 +122,32 @@ def extract_label_value(li: Any) -> Optional[Dict[str, Optional[str]]]:
         value = full_text.replace(raw_label, "", 1).strip(" :")
 
     return {"label": label, "value": value or None}
+
+
+def extract_public_procurement_id(public_procurement_url: Optional[str]) -> Optional[str]:
+    """Extract procurement identifier from known external procurement URLs."""
+    if not public_procurement_url:
+        return None
+
+    parsed = urlparse(public_procurement_url)
+    path = parsed.path or ""
+
+    # Josephine format: /sk/tender/<id>/summary
+    tender_match = re.search(r"/tender/(\d+)(?:/|$)", path)
+    if tender_match:
+        return tender_match.group(1)
+
+    # UVO format often includes /detail/<id>
+    detail_match = re.search(r"/detail/(\d+)(?:/|$)", path)
+    if detail_match:
+        return detail_match.group(1)
+
+    # Fallback: use the last numeric segment in path.
+    numeric_parts = re.findall(r"\d+", path)
+    if numeric_parts:
+        return numeric_parts[-1]
+
+    return None
 
 
 def matches_price_filter(
@@ -219,6 +251,26 @@ def fetch_page(
     return None
 
 
+def build_listing_page_url(
+    listing_url: str,
+    page_index: int,
+    crz_filters: Optional[Dict[str, Optional[str]]] = None,
+) -> str:
+    """Build listing URL with page index and optional CRZ query filters."""
+    parsed = urlparse(listing_url)
+    query_map = dict(parse_qsl(parsed.query, keep_blank_values=True))
+
+    if crz_filters:
+        for key, value in crz_filters.items():
+            if value is None:
+                continue
+            query_map[key] = str(value)
+
+    query_map["page"] = str(page_index)
+    new_query = urlencode(query_map, doseq=True)
+    return urlunparse(parsed._replace(query=new_query))
+
+
 def extract_listing_rows(html: str) -> List[Dict[str, Any]]:
     """Extract contract rows from listing page HTML."""
     soup = BeautifulSoup(html, "html.parser")
@@ -302,6 +354,25 @@ def extract_listing_rows(html: str) -> List[Dict[str, Any]]:
     return rows
 
 
+def detect_canonical_listing_url(html: str, current_listing_url: str) -> Optional[str]:
+    """Detect canonical CRZ listing URL from filter form action on landing pages."""
+    soup = BeautifulSoup(html, "html.parser")
+
+    filter_form = soup.find("form", id=re.compile(r"^frm_filter_"))
+    if not filter_form:
+        return None
+
+    action = filter_form.get("action")
+    if not action:
+        return None
+
+    candidate = urljoin(BASE_URL, action)
+    if candidate.rstrip("/") == current_listing_url.rstrip("/"):
+        return None
+
+    return candidate
+
+
 def extract_contract_details(html: str, contract_url: str) -> Dict[str, Any]:
     """Extract detailed contract information from detail page."""
     del contract_url  # kept for backwards-compatible signature
@@ -325,8 +396,6 @@ def extract_contract_details(html: str, contract_url: str) -> Dict[str, Any]:
         if "identifik" in header_norm:
             list_items = body.find_all("li")
             last_entity = None  # buyer/supplier/rezort context for repeated ICO labels
-            identification_items: List[Dict[str, Optional[str]]] = []
-            identification_fields: Dict[str, Any] = {}
 
             for li in list_items:
                 label_value = extract_label_value(li)
@@ -336,17 +405,6 @@ def extract_contract_details(html: str, contract_url: str) -> Dict[str, Any]:
                 label = label_value["label"]
                 value = label_value["value"]
                 label_norm = normalize_text(label)
-
-                identification_items.append({"label": label, "value": value})
-
-                if label in identification_fields:
-                    existing = identification_fields[label]
-                    if isinstance(existing, list):
-                        existing.append(value)
-                    else:
-                        identification_fields[label] = [existing, value]
-                else:
-                    identification_fields[label] = value
 
                 if "c. zmluvy" in label_norm or "cislo zmluvy" in label_norm:
                     details["contract_number_detail"] = value
@@ -370,11 +428,24 @@ def extract_contract_details(html: str, contract_url: str) -> Dict[str, Any]:
                         details["ico_supplier"] = value
                     elif last_entity == "rezort":
                         details["ico_rezort"] = value
-
-            if identification_items:
-                details["identification_section_items"] = identification_items
-            if identification_fields:
-                details["identification_fields"] = identification_fields
+                elif "verejne obstaravanie" in label_norm:
+                    # Some contracts include an external procurement portal link
+                    # (for example UVO/Josephine). Keep both label and URL.
+                    link = li.find("a", href=True)
+                    if link:
+                        details["public_procurement_url"] = urljoin(
+                            BASE_URL,
+                            link["href"],
+                        )
+                        details["public_procurement_id"] = extract_public_procurement_id(
+                            details["public_procurement_url"]
+                        )
+                        details["public_procurement_portal"] = link.get_text(
+                            " ",
+                            strip=True,
+                        )
+                    elif value:
+                        details["public_procurement_portal"] = value
 
         elif "datum" in header_norm:
             list_items = body.find_all("li")
@@ -407,6 +478,24 @@ def extract_contract_details(html: str, contract_url: str) -> Dict[str, Any]:
             if pdfs:
                 details["pdf_urls"] = pdfs
 
+        # Fallback: if the field exists outside expected section/card structure.
+        if "public_procurement_url" not in details:
+            for li in soup.find_all("li"):
+                strong = li.find("strong")
+                if not strong:
+                    continue
+                label_norm = normalize_text(strong.get_text(" ", strip=True))
+                if "verejne obstaravanie" not in label_norm:
+                    continue
+
+                link = li.find("a", href=True)
+                if link:
+                    details["public_procurement_url"] = urljoin(BASE_URL, link["href"])
+                    details["public_procurement_id"] = extract_public_procurement_id(
+                        details["public_procurement_url"]
+                    )
+                    details["public_procurement_portal"] = link.get_text(" ", strip=True)
+                    break
     return details
 
 
@@ -414,13 +503,16 @@ def download_and_extract_pdf(
     pdf_url: str,
     pdf_dir: str,
     session: requests.Session,
+    agreement_context: Optional[str] = None,
     throttler: Optional[RequestThrottler] = None,
+    ocr_executor: Optional[ThreadPoolExecutor] = None,
 ) -> Dict[str, Any]:
-    """Download PDF and extract text."""
+    """Download PDF and optionally run text extraction in background."""
     result = {
         "pdf_url": pdf_url,
         "pdf_local_path": None,
         "pdf_text": None,
+        "text_future": None,
     }
 
     try:
@@ -432,7 +524,10 @@ def download_and_extract_pdf(
         pdf_path = os.path.join(pdf_dir, filename)
         Path(pdf_dir).mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Downloading PDF: {pdf_url}")
+        if agreement_context:
+            logger.info("Downloading PDF for %s: %s", agreement_context, pdf_url)
+        else:
+            logger.info("Downloading PDF: %s", pdf_url)
         if throttler:
             throttler.wait_for_slot()
         response = session.get(pdf_url, timeout=DEFAULT_TIMEOUT)
@@ -443,38 +538,14 @@ def download_and_extract_pdf(
 
         result["pdf_local_path"] = pdf_path
 
-        try:
-            with pdfplumber.open(pdf_path) as pdf:
-                text_parts = []
-                for page in pdf.pages:
-                    page_text = page.extract_text()
-                    if page_text:
-                        text_parts.append(page_text)
-
-                full_text = "\n".join(text_parts)
-                result["pdf_text"] = full_text[:50000] if full_text else None
-
-                logger.info(f"Extracted {len(full_text)} chars from PDF")
-
-                if not _is_readable_text(result["pdf_text"]):
-                    logger.info(
-                        "Text extraction returned too little text, trying OCR fallback"
-                    )
-                    ocr_text = extract_text_with_ocr(pdf_path)
-                    if ocr_text:
-                        result["pdf_text"] = ocr_text[:50000]
-                        logger.info(
-                            "OCR fallback extracted %d chars", len(result["pdf_text"])
-                        )
-        except Exception as e:
-            logger.warning(f"Failed to extract text from PDF {pdf_path}: {e}")
-            ocr_text = extract_text_with_ocr(pdf_path)
-            if ocr_text:
-                result["pdf_text"] = ocr_text[:50000]
-                logger.info(
-                    "OCR fallback extracted %d chars after pdfplumber failure",
-                    len(result["pdf_text"]),
-                )
+        if ocr_executor:
+            logger.info("Scheduling async PDF text extraction")
+            result["text_future"] = ocr_executor.submit(
+                _extract_pdf_text_with_fallback,
+                pdf_path,
+            )
+        else:
+            result["pdf_text"] = _extract_pdf_text_with_fallback(pdf_path)
 
     except Exception as e:
         logger.error(f"Failed to download/process PDF {pdf_url}: {e}")
@@ -487,6 +558,49 @@ def _is_readable_text(text: Optional[str], min_chars: int = 30) -> bool:
     if not text:
         return False
     return len("".join(text.split())) >= min_chars
+
+
+def _extract_pdf_text_with_fallback(pdf_path: str) -> Optional[str]:
+    """Extract text via pdfplumber, then OCR fallback for scanned PDFs."""
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            text_parts = []
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text_parts.append(page_text)
+
+            full_text = "\n".join(text_parts)
+            text = full_text[:50000] if full_text else None
+            logger.info("Extracted %d chars from PDF", len(full_text))
+
+            if _is_readable_text(text):
+                return text
+
+            logger.info("Text extraction returned too little text, trying OCR fallback")
+            ocr_text = _extract_text_with_ocr_threadsafe(pdf_path)
+            if ocr_text:
+                clipped = ocr_text[:50000]
+                logger.info("OCR fallback extracted %d chars", len(clipped))
+                return clipped
+            return text
+    except Exception as e:
+        logger.warning("Failed to extract text from PDF %s: %s", pdf_path, e)
+        ocr_text = _extract_text_with_ocr_threadsafe(pdf_path)
+        if ocr_text:
+            clipped = ocr_text[:50000]
+            logger.info(
+                "OCR fallback extracted %d chars after pdfplumber failure",
+                len(clipped),
+            )
+            return clipped
+    return None
+
+
+def _extract_text_with_ocr_threadsafe(pdf_path: str) -> Optional[str]:
+    """Run OCR fallback under a process-wide lock to avoid native crashes."""
+    with OCR_LOCK:
+        return extract_text_with_ocr(pdf_path)
 
 
 def extract_text_with_ocr(
@@ -650,12 +764,15 @@ def scrape_contracts(
     start_page: int = 1,
     max_pages: int = 1,
     max_contracts: Optional[int] = None,
+    listing_url: str = LISTING_URL,
+    crz_filters: Optional[Dict[str, Optional[str]]] = None,
     output_file: str = "out.json",
     delay: float = DEFAULT_DELAY,
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     user_agent: str = DEFAULT_USER_AGENT,
     pdf_dir: str = "data/pdfs",
+    ocr_workers: int = 2,
 ) -> int:
     """
     Main scraping function.
@@ -664,12 +781,16 @@ def scrape_contracts(
         start_page: Starting page number (1-indexed)
         max_pages: Maximum number of pages to scrape
         max_contracts: Optional hard limit on number of contracts to process
+        listing_url: Listing URL to scrape (default CRZ /zmluvy/ listing)
+        crz_filters: Optional CRZ server-side query filters, e.g. art_ico, art_predmet
         output_file: Output JSON file path
         delay: Delay between requests in seconds
         min_price: Minimum accepted contract value in EUR (inclusive)
         max_price: Maximum accepted contract value in EUR (inclusive)
         user_agent: Custom User-Agent header
         pdf_dir: Directory to save PDFs
+        ocr_workers: Number of background workers for PDF text extraction
+            (including OCR fallback when needed)
 
     Returns:
         Number of contracts scraped
@@ -687,14 +808,43 @@ def scrape_contracts(
 
     contracts_processed = 0
     pdfs_downloaded = 0
+    scraped_contracts: List[Dict[str, Any]] = []
+    pending_text_jobs: List[Dict[str, Any]] = []
+    existing_contracts: List[Dict[str, Any]] = []
+    known_contract_ids: set[str] = set()
+    active_listing_url = listing_url
+
+    output_path = Path(output_file)
+    if output_path.exists():
+        existing_text = output_path.read_text(encoding="utf-8").strip()
+        if existing_text:
+            loaded = json.loads(existing_text)
+            if not isinstance(loaded, list):
+                raise ValueError(
+                    f"Existing output file {output_file} must contain a JSON array"
+                )
+            existing_contracts = loaded
+            known_contract_ids = {
+                str(item.get("contract_id"))
+                for item in existing_contracts
+                if isinstance(item, dict) and item.get("contract_id")
+            }
+            logger.info(
+                "Loaded %d existing contracts (%d with contract_id) from %s",
+                len(existing_contracts),
+                len(known_contract_ids),
+                output_file,
+            )
 
     try:
-        with open(output_file, "w", encoding="utf-8") as out_f:
-            out_f.write("[\n")
-            first_record = True
+        with ThreadPoolExecutor(max_workers=max(1, ocr_workers)) as ocr_executor:
             for page_num in range(start_page, start_page + max_pages):
                 url_page = page_num - 1
-                page_url = f"{LISTING_URL}?page={url_page}"
+                page_url = build_listing_page_url(
+                    listing_url=active_listing_url,
+                    page_index=url_page,
+                    crz_filters=crz_filters,
+                )
 
                 logger.info(f"Fetching page {page_num} (URL page={url_page})")
                 html = fetch_page(page_url, session, throttler=throttler)
@@ -704,6 +854,35 @@ def scrape_contracts(
                     continue
 
                 rows = extract_listing_rows(html)
+
+                if not rows:
+                    canonical_listing_url = detect_canonical_listing_url(
+                        html,
+                        active_listing_url,
+                    )
+                    if canonical_listing_url:
+                        logger.info(
+                            "Detected canonical CRZ listing URL from filter action: %s",
+                            canonical_listing_url,
+                        )
+                        active_listing_url = canonical_listing_url
+                        retry_page_url = build_listing_page_url(
+                            listing_url=active_listing_url,
+                            page_index=url_page,
+                            crz_filters=crz_filters,
+                        )
+                        logger.info(
+                            "Retrying page %d using canonical listing URL",
+                            page_num,
+                        )
+                        retry_html = fetch_page(
+                            retry_page_url,
+                            session,
+                            throttler=throttler,
+                        )
+                        if retry_html:
+                            rows = extract_listing_rows(retry_html)
+
                 logger.info(f"Found {len(rows)} contracts on page {page_num}")
 
                 if min_price is not None or max_price is not None:
@@ -730,8 +909,27 @@ def scrape_contracts(
                         )
                         break
 
+                    row_contract_id = row.get("contract_id")
+                    if row_contract_id and row_contract_id in known_contract_ids:
+                        logger.info(
+                            "Skipping already present contract_id=%s",
+                            row_contract_id,
+                        )
+                        continue
+
                     try:
                         contract_data = dict(row)
+                        agreement_context = (
+                            "row=%d page=%d contract_id=%s title=%s"
+                            % (
+                                contracts_processed + 1,
+                                page_num,
+                                row.get("contract_id") or "unknown",
+                                row.get("contract_title") or "unknown",
+                            )
+                        )
+                        logger.info("Processing agreement %s", agreement_context)
+
                         contract_data["scraped_at"] = (
                             datetime.now(timezone.utc)
                             .isoformat()
@@ -758,26 +956,46 @@ def scrape_contracts(
                                 contract_data.update(details)
 
                                 pdf_urls = details.get("pdf_urls", [])
-                                for pdf_url in pdf_urls:
+                                if pdf_urls:
+                                    # Keep all attachment links in `pdf_urls`, but only
+                                    # download/extract the primary attachment used downstream.
+                                    primary_pdf_url = pdf_urls[0]
                                     pdf_result = download_and_extract_pdf(
-                                        pdf_url,
+                                        primary_pdf_url,
                                         pdf_dir,
                                         session,
+                                        agreement_context=agreement_context,
                                         throttler=throttler,
+                                        ocr_executor=ocr_executor,
                                     )
 
-                                    if (
-                                        pdf_result["pdf_local_path"]
-                                        and not contract_data.get("pdf_local_path")
-                                    ):
+                                    text_future = pdf_result.pop("text_future", None)
+
+                                    if pdf_result["pdf_local_path"]:
                                         contract_data.update(pdf_result)
                                         pdfs_downloaded += 1
 
-                        if not first_record:
-                            out_f.write(",\n")
-                        out_f.write(json.dumps(contract_data, ensure_ascii=False))
-                        first_record = False
+                                    if isinstance(text_future, Future):
+                                        pending_text_jobs.append(
+                                            {
+                                                "future": text_future,
+                                                "contract_data": contract_data,
+                                                "agreement_context": agreement_context,
+                                            }
+                                        )
+
+                                    skipped_attachments = max(0, len(pdf_urls) - 1)
+                                    if skipped_attachments:
+                                        logger.info(
+                                            "Skipping %d additional PDF attachments for %s; links retained in pdf_urls",
+                                            skipped_attachments,
+                                            agreement_context,
+                                        )
+
+                        scraped_contracts.append(contract_data)
                         contracts_processed += 1
+                        if row_contract_id:
+                            known_contract_ids.add(row_contract_id)
 
                     except Exception as e:
                         logger.error(
@@ -788,7 +1006,33 @@ def scrape_contracts(
                 if max_contracts is not None and contracts_processed >= max_contracts:
                     break
 
-            out_f.write("\n]\n")
+            if pending_text_jobs:
+                logger.info(
+                    "Waiting for %d background text extraction jobs to finish",
+                    len(pending_text_jobs),
+                )
+
+            for text_job in pending_text_jobs:
+                try:
+                    extracted_text = text_job["future"].result()
+                    if extracted_text:
+                        text_job["contract_data"]["pdf_text"] = extracted_text[:50000]
+                        logger.info(
+                            "Text extraction finished for %s: %d chars",
+                            text_job["agreement_context"],
+                            len(text_job["contract_data"]["pdf_text"]),
+                        )
+                except Exception as text_error:
+                    logger.warning(
+                        "Background text extraction failed for %s: %s",
+                        text_job["agreement_context"],
+                        text_error,
+                    )
+
+        combined_contracts = existing_contracts + scraped_contracts
+        with open(output_file, "w", encoding="utf-8") as out_f:
+            out_f.write(json.dumps(combined_contracts, ensure_ascii=False, indent=2))
+            out_f.write("\n")
 
     except Exception as e:
         logger.error(f"Scraping failed: {e}")

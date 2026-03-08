@@ -167,6 +167,7 @@ def _scope_summary_lines(contracts: List[Contract], agg: Dict[str, Any]) -> List
         "SCOPE SUMMARY",
         "",
         f"- Contracts in scope: {len(contracts)}",
+        f"- In-scope contracts (count text): {len(contracts)} contracts",
         f"- Total value: {agg['total_spend']:,.2f} EUR",
         f"- Average value: {agg['avg_value']:,.2f} EUR",
         f"- Maximum value: {agg['max_value']:,.2f} EUR",

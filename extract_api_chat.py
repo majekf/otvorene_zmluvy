@@ -1,17 +1,18 @@
 #!/usr/bin/env python
 """Analyze contract text with OpenAI and write scanned_* fields back to JSON."""
 
+import asyncio
 import argparse
 import json
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import pdfplumber
 import requests
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import AsyncOpenAI, OpenAI
 from tqdm import tqdm
 
 # Load environment variables from .env (if present) for OPENAI_API_KEY.
@@ -104,10 +105,11 @@ def clean_json_response(content: str) -> Dict[str, Any]:
     raise ValueError("Invalid JSON from model")
 
 
-def analyze_contract(text: str, client: OpenAI, model_name: str) -> Dict[str, Any]:
+def _build_contract_prompt(text: str) -> str:
+    """Build extraction prompt from contract text."""
     """Ask OpenAI to extract normalized contract metadata as JSON."""
     snippet = text[:22000]
-    prompt = f"""
+    return f"""
 Extract structured data from Slovak public procurement contract.
 
 Return JSON:
@@ -135,6 +137,10 @@ CONTRACT TEXT:
 ---
 """
 
+
+def analyze_contract(text: str, client: OpenAI, model_name: str) -> Dict[str, Any]:
+    """Synchronous OpenAI extraction helper (kept for compatibility)."""
+    prompt = _build_contract_prompt(text)
     response = client.chat.completions.create(
         model=model_name,
         messages=[{"role": "user", "content": prompt}],
@@ -142,6 +148,55 @@ CONTRACT TEXT:
     )
     content = response.choices[0].message.content or "{}"
     return clean_json_response(content)
+
+
+async def analyze_contract_async(
+    text: str,
+    client: AsyncOpenAI,
+    model_name: str,
+) -> Dict[str, Any]:
+    """Asynchronous OpenAI extraction for one contract text."""
+    prompt = _build_contract_prompt(text)
+    response = await client.chat.completions.create(
+        model=model_name,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0,
+    )
+    content = response.choices[0].message.content or "{}"
+    return clean_json_response(content)
+
+
+async def analyze_contracts_batch_async(
+    work_items: List[Tuple[int, str, str]],
+    api_key: str,
+    model_name: str,
+    max_concurrency: int,
+) -> List[Tuple[int, str, Optional[Dict[str, Any]], Optional[str]]]:
+    """Run OpenAI extraction concurrently and return per-item results."""
+    client = AsyncOpenAI(api_key=api_key)
+    semaphore = asyncio.Semaphore(max(1, max_concurrency))
+
+    async def _worker(
+        contract_index: int,
+        contract_id: str,
+        text: str,
+    ) -> Tuple[int, str, Optional[Dict[str, Any]], Optional[str]]:
+        try:
+            async with semaphore:
+                ai_data = await analyze_contract_async(
+                    text,
+                    client=client,
+                    model_name=model_name,
+                )
+            return contract_index, contract_id, ai_data, None
+        except Exception as e:
+            return contract_index, contract_id, None, str(e)
+
+    tasks = [
+        _worker(contract_index, contract_id, text)
+        for contract_index, contract_id, text in work_items
+    ]
+    return await asyncio.gather(*tasks)
 
 
 def add_scanned_fields(contract: Dict[str, Any], ai_data: Dict[str, Any]) -> None:
@@ -164,6 +219,7 @@ def process_contracts_file(
     api_key: Optional[str] = None,
     skip_processed: bool = True,
     prefer_existing_pdf_text: bool = True,
+    max_concurrency: int = 5,
 ) -> Dict[str, int]:
     """Analyze contracts and persist scanned_* fields back to input JSON file."""
     input_path = Path(input_file)
@@ -175,7 +231,8 @@ def process_contracts_file(
         raise ValueError("OPENAI_API_KEY is not set and no --api-key was provided")
 
     Path(pdf_dir).mkdir(parents=True, exist_ok=True)
-    client = OpenAI(api_key=resolved_api_key)
+    if max_concurrency <= 0:
+        raise ValueError("max_concurrency must be greater than 0")
 
     with open(input_path, "r", encoding="utf-8") as f:
         contracts = json.load(f)
@@ -189,8 +246,9 @@ def process_contracts_file(
         "skipped": 0,
         "failed": 0,
     }
+    work_items: List[Tuple[int, str, str]] = []
 
-    for contract in tqdm(contracts):
+    for contract_index, contract in enumerate(tqdm(contracts)):
         if not isinstance(contract, dict):
             stats["skipped"] += 1
             continue
@@ -227,13 +285,30 @@ def process_contracts_file(
         text = clean_extracted_text(raw_text)
         debug_print_text(contract_id, text)
 
-        try:
-            ai_data = analyze_contract(text, client=client, model_name=model_name)
-            add_scanned_fields(contract, ai_data)
+        work_items.append((contract_index, contract_id, text))
+
+    if work_items:
+        results = asyncio.run(
+            analyze_contracts_batch_async(
+                work_items=work_items,
+                api_key=resolved_api_key,
+                model_name=model_name,
+                max_concurrency=max_concurrency,
+            )
+        )
+
+        for contract_index, contract_id, ai_data, error_text in results:
+            if error_text:
+                print(f"[ERROR] AI failed for {contract_id}: {error_text}")
+                stats["failed"] += 1
+                continue
+
+            if ai_data is None:
+                stats["failed"] += 1
+                continue
+
+            add_scanned_fields(contracts[contract_index], ai_data)
             stats["processed"] += 1
-        except Exception as e:
-            print(f"[ERROR] AI failed for {contract_id}: {e}")
-            stats["failed"] += 1
 
     with open(input_path, "w", encoding="utf-8") as f:
         json.dump(contracts, f, ensure_ascii=False, indent=2)
@@ -249,6 +324,12 @@ def main() -> None:
     parser.add_argument("--pdf-dir", type=str, default=PDF_DIR)
     parser.add_argument("--model", type=str, default=MODEL_NAME)
     parser.add_argument("--api-key", type=str, default=None)
+    parser.add_argument(
+        "--max-concurrency",
+        type=int,
+        default=5,
+        help="Maximum number of concurrent OpenAI extraction requests",
+    )
     parser.add_argument(
         "--no-skip-processed",
         action="store_true",
@@ -269,6 +350,7 @@ def main() -> None:
         api_key=args.api_key,
         skip_processed=not args.no_skip_processed,
         prefer_existing_pdf_text=not args.ignore_existing_pdf_text,
+        max_concurrency=args.max_concurrency,
     )
 
     print(

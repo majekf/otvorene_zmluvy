@@ -18,7 +18,7 @@ from src.models import AggregationResult, FilterState
 # ── Fixtures ────────────────────────────────────────────────────────
 
 SAMPLE_DATA_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), "data", "sample_contracts.json"
+    os.path.dirname(__file__), "test_data.json"
 )
 
 
@@ -572,7 +572,7 @@ class TestRankings:
 
 
 class TestSampleData:
-    """Smoke tests using the real sample_contracts.json."""
+    """Smoke tests using the real test_data.json."""
 
     def test_total_spend_positive(self, store: DataStore):
         """Total spend across all sample contracts is positive."""

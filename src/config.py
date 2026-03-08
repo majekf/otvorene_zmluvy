@@ -26,6 +26,9 @@ class Settings:
         self.data_path: str = os.getenv(
             "GOVLENS_DATA_PATH", "data/sample_contracts.json"
         )
+        self.subcontractors_data_path: str = os.getenv(
+            "GOVLENS_SUBCONTRACTORS_DATA_PATH", ""
+        )
 
         # LLM
         self.llm_provider: str = os.getenv("LLM_PROVIDER", "mock")

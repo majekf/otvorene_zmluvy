@@ -11,6 +11,7 @@ import type {
   BenchmarkResponse,
   BenchmarkPeersResponse,
   BenchmarkMultiMetricResponse,
+  CompareAggregationsResponse,
   ConditionGroupData,
   CustomRuleResponse,
   FilterState,
@@ -97,6 +98,16 @@ export async function fetchAggregations(
   return get<AggregationsResponse>(`/api/aggregations${qs(p)}`);
 }
 
+// ── Compare (Contracts vs Subcontractors) ───────────────────────────
+
+export async function fetchCompareAggregations(
+  filters: FilterState = {},
+  groupBy: GroupByField = 'category',
+): Promise<CompareAggregationsResponse> {
+  const p = { ...filterParams(filters), group_by: groupBy };
+  return get<CompareAggregationsResponse>(`/api/compare/aggregations${qs(p)}`);
+}
+
 // ── Treemap ─────────────────────────────────────────────────────────
 
 export async function fetchTreemap(
@@ -115,8 +126,9 @@ export async function fetchBenchmark(
   institutions: string[],
   metric = 'total_spend',
   minContracts?: number,
+  filters: FilterState = {},
 ): Promise<BenchmarkResponse> {
-  const p: Record<string, string> = { institutions: institutions.join('|'), metric };
+  const p: Record<string, string> = { ...filterParams(filters), institutions: institutions.join('|'), metric };
   if (minContracts !== undefined) p.min_contracts = String(minContracts);
   return get<BenchmarkResponse>(`/api/benchmark${qs(p)}`);
 }
@@ -124,16 +136,18 @@ export async function fetchBenchmark(
 export async function fetchBenchmarkPeers(
   institution: string,
   minContracts = 1,
+  filters: FilterState = {},
 ): Promise<BenchmarkPeersResponse> {
-  const p = { institution, min_contracts: String(minContracts) };
+  const p = { ...filterParams(filters), institution, min_contracts: String(minContracts) };
   return get<BenchmarkPeersResponse>(`/api/benchmark/peers${qs(p)}`);
 }
 
 export async function fetchBenchmarkMultiMetric(
   institutions: string[],
   metrics: string[],
+  filters: FilterState = {},
 ): Promise<BenchmarkMultiMetricResponse> {
-  const p = { institutions: institutions.join('|'), metrics: metrics.join(',') };
+  const p = { ...filterParams(filters), institutions: institutions.join('|'), metrics: metrics.join(',') };
   return get<BenchmarkMultiMetricResponse>(`/api/benchmark/compare${qs(p)}`);
 }
 
@@ -171,15 +185,20 @@ export async function fetchRankings(
   entity: 'institutions' | 'vendors' = 'institutions',
   metric = 'total_spend',
   filters: FilterState = {},
+  page = 1,
+  pageSize = 20,
 ): Promise<RankingsResponse> {
-  const p = { ...filterParams(filters), entity, metric };
+  const p = { ...filterParams(filters), entity, metric, page: String(page), page_size: String(pageSize) };
   return get<RankingsResponse>(`/api/rankings${qs(p)}`);
 }
 
 // ── Institutions ────────────────────────────────────────────────────
 
-export async function fetchInstitutions(): Promise<{ institutions: InstitutionSummary[] }> {
-  return get<{ institutions: InstitutionSummary[] }>('/api/institutions');
+export async function fetchInstitutions(
+  filters: FilterState = {},
+): Promise<{ institutions: InstitutionSummary[] }> {
+  const p = filterParams(filters);
+  return get<{ institutions: InstitutionSummary[] }>(`/api/institutions${qs(p)}`);
 }
 
 export async function fetchCategories(): Promise<{ categories: string[] }> {

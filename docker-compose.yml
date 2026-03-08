@@ -11,6 +11,7 @@ services:
       - GOVLENS_HOST=0.0.0.0
       - GOVLENS_PORT=8000
       - GOVLENS_DATA_PATH=data/sample_contracts.json
+      - GOVLENS_SUBCONTRACTORS_DATA_PATH=${GOVLENS_SUBCONTRACTORS_DATA_PATH:-}
       # Read provider/key from env file or shell.
       - LLM_PROVIDER=${LLM_PROVIDER:-mock}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}

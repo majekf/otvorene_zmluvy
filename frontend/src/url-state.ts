@@ -46,7 +46,7 @@ export function parseUrlState(search: string): UrlState {
     }
   }
 
-  const groupBy = (p.get('group_by') as GroupByField) || 'category';
+  const groupBy = (p.get('group_by') as GroupByField) || 'supplier';
   const page = Math.max(1, Number(p.get('page')) || 1);
   const pageSize = Math.max(1, Number(p.get('page_size')) || 20);
   const mode = (p.get('mode') as AppMode) || 'dashboard';
@@ -75,7 +75,7 @@ export function encodeUrlState(state: UrlState): string {
   if (state.sort.length) {
     p.set('sort', state.sort.map(([field, dir]) => `${field}:${dir}`).join(','));
   }
-  if (state.groupBy && state.groupBy !== 'category') {
+  if (state.groupBy && state.groupBy !== 'supplier') {
     p.set('group_by', state.groupBy);
   }
   if (state.page > 1) p.set('page', String(state.page));
@@ -90,7 +90,7 @@ export function defaultUrlState(): UrlState {
   return {
     filters: {},
     sort: [],
-    groupBy: 'category',
+    groupBy: 'supplier',
     page: 1,
     pageSize: 20,
     mode: 'dashboard',

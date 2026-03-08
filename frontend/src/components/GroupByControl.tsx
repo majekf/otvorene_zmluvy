@@ -1,7 +1,7 @@
 /**
  * GroupByControl Component
  *
- * Toggle between group-by fields: Category, Vendor, Month, Award Type.
+ * Toggle between group-by fields: Vendor, Institution, Category, Month, Award Type.
  */
 
 import type { GroupByField } from '../types';
@@ -12,9 +12,9 @@ interface GroupByControlProps {
 }
 
 const OPTIONS: { value: GroupByField; label: string }[] = [
-  { value: 'category', label: 'Category' },
   { value: 'supplier', label: 'Vendor' },
   { value: 'buyer', label: 'Institution' },
+  { value: 'category', label: 'Category' },
   { value: 'month', label: 'Month' },
   { value: 'award_type', label: 'Award Type' },
 ];

@@ -11,6 +11,7 @@ import VendorProfile from './pages/VendorProfile';
 import BenchmarkView from './pages/BenchmarkView';
 import TimeView from './pages/TimeView';
 import GlobalView from './pages/GlobalView';
+import CompareView from './pages/CompareView';
 import ChatBar from './components/ChatBar';
 import ErrorBoundary from './components/ErrorBoundary';
 import { FilterProvider, useFilterContext } from './FilterContext';
@@ -90,6 +91,7 @@ function AppShell() {
                 <NavLink to="/benchmark" label="Benchmark" />
                 <NavLink to="/time" label="Trends" />
                 <NavLink to="/rankings" label="Rankings" />
+                <NavLink to="/compare" label="Compare" />
               </nav>
             </div>
             <span className="hidden md:inline text-xs font-medium text-slate-400 tracking-wide">
@@ -111,6 +113,7 @@ function AppShell() {
             <Route path="/benchmark" element={<BenchmarkView />} />
             <Route path="/time" element={<TimeView />} />
             <Route path="/rankings" element={<GlobalView />} />
+            <Route path="/compare" element={<CompareView />} />
           </Routes>
         </ErrorBoundary>
       </main>
