@@ -83,7 +83,7 @@ function AppShell() {
                   <svg className="w-4.5 h-4.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.64 0 8.577 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.64 0-8.577-3.007-9.963-7.178Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
                 </div>
                 <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-primary-700 to-primary-500 bg-clip-text text-transparent">
-                  GovLens
+                  Neuniknenam
                 </span>
               </Link>
               <nav className="hidden sm:flex items-center gap-1" data-testid="main-nav">
@@ -122,7 +122,7 @@ function AppShell() {
       </main>
 
       <footer className="text-center text-xs text-slate-400 py-6 border-t border-slate-100 bg-white/40">
-        <span className="font-medium">GovLens</span> &middot; Data from{' '}
+        <span className="font-medium">Neuniknenam</span> &middot; Data from{' '}
         <a href="https://crz.gov.sk" target="_blank" rel="noopener noreferrer" className="hover:text-primary-600 transition-colors">crz.gov.sk</a>
       </footer>
 
