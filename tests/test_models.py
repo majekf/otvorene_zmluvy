@@ -138,6 +138,7 @@ class TestFilterStateDefaults:
         assert fs.date_to is None
         assert fs.categories is None
         assert fs.vendors is None
+        assert fs.icos is None
         assert fs.value_min is None
         assert fs.value_max is None
         assert fs.award_types is None

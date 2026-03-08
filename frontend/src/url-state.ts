@@ -29,6 +29,9 @@ export function parseUrlState(search: string): UrlState {
   if (p.get('date_to')) filters.date_to = p.get('date_to')!;
   if (p.get('categories')) filters.categories = p.get('categories')!.split('|');
   if (p.get('vendors')) filters.vendors = p.get('vendors')!.split('|');
+  if (p.get('institution_icos')) filters.institution_icos = p.get('institution_icos')!.split('|');
+  if (p.get('vendor_icos')) filters.vendor_icos = p.get('vendor_icos')!.split('|');
+  if (p.get('icos')) filters.icos = p.get('icos')!.split('|');
   if (p.get('value_min')) filters.value_min = Number(p.get('value_min'));
   if (p.get('value_max')) filters.value_max = Number(p.get('value_max'));
   if (p.get('award_types')) filters.award_types = p.get('award_types')!.split('|');
@@ -61,6 +64,9 @@ export function encodeUrlState(state: UrlState): string {
   if (f.date_to) p.set('date_to', f.date_to);
   if (f.categories?.length) p.set('categories', f.categories.join('|'));
   if (f.vendors?.length) p.set('vendors', f.vendors.join('|'));
+  if (f.institution_icos?.length) p.set('institution_icos', f.institution_icos.join('|'));
+  if (f.vendor_icos?.length) p.set('vendor_icos', f.vendor_icos.join('|'));
+  if (f.icos?.length) p.set('icos', f.icos.join('|'));
   if (f.value_min !== undefined) p.set('value_min', String(f.value_min));
   if (f.value_max !== undefined) p.set('value_max', String(f.value_max));
   if (f.award_types?.length) p.set('award_types', f.award_types.join('|'));

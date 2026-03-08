@@ -31,7 +31,24 @@ export default function Dashboard() {
   // Parse URL state (for sort / groupBy / page only – filters come from context)
   const urlState = useMemo(() => parseUrlState(searchParams.toString()), [searchParams]);
 
-  const { filters, setFilters, institutions: distinctInstitutions, categories: distinctCategories, vendors: distinctVendors, awardTypes: distinctAwardTypes } = useFilterContext();
+  const {
+    filters,
+    setFilters,
+    institutions: distinctInstitutions,
+    categories: distinctCategories,
+    vendors: distinctVendors,
+    institutionIcos,
+    vendorIcos,
+    institutionIcoMap,
+    vendorIcoMap,
+    institutionCounts,
+    vendorCounts,
+    institutionIcoCounts,
+    vendorIcoCounts,
+    categoryCounts,
+    awardTypes: distinctAwardTypes,
+    optionsLoaded,
+  } = useFilterContext();
   const [sort] = useState<SortSpec>(urlState.sort);
   const [groupBy, setGroupBy] = useState<GroupByField>(urlState.groupBy);
   const [page] = useState(urlState.page);
@@ -92,7 +109,17 @@ export default function Dashboard() {
         institutions={distinctInstitutions}
         categories={distinctCategories}
         vendors={distinctVendors}
+        institutionIcos={institutionIcos}
+        vendorIcos={vendorIcos}
+        institutionIcoMap={institutionIcoMap}
+        vendorIcoMap={vendorIcoMap}
+        institutionCounts={institutionCounts}
+        vendorCounts={vendorCounts}
+        institutionIcoCounts={institutionIcoCounts}
+        vendorIcoCounts={vendorIcoCounts}
+        categoryCounts={categoryCounts}
         awardTypes={distinctAwardTypes}
+        optionsLoaded={optionsLoaded}
       />
 
       {/* Summary strip */}

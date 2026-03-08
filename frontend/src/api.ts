@@ -24,6 +24,7 @@ import type {
   Contract,
   TreemapNode,
   TrendsResponseWithOverlays,
+  FilterOptionsResponse,
   VendorProfile,
   VendorSummary,
   SortSpec,
@@ -40,6 +41,9 @@ function filterParams(filters: FilterState): Record<string, string> {
   if (filters.date_to) p.date_to = filters.date_to;
   if (filters.categories?.length) p.categories = filters.categories.join('|');
   if (filters.vendors?.length) p.vendors = filters.vendors.join('|');
+  if (filters.institution_icos?.length) p.institution_icos = filters.institution_icos.join('|');
+  if (filters.vendor_icos?.length) p.vendor_icos = filters.vendor_icos.join('|');
+  if (filters.icos?.length) p.icos = filters.icos.join('|');
   if (filters.value_min !== undefined) p.value_min = String(filters.value_min);
   if (filters.value_max !== undefined) p.value_max = String(filters.value_max);
   if (filters.award_types?.length) p.award_types = filters.award_types.join('|');
@@ -176,6 +180,16 @@ export async function fetchRankings(
 
 export async function fetchInstitutions(): Promise<{ institutions: InstitutionSummary[] }> {
   return get<{ institutions: InstitutionSummary[] }>('/api/institutions');
+}
+
+export async function fetchCategories(): Promise<{ categories: string[] }> {
+  return get<{ categories: string[] }>('/api/categories');
+}
+
+export async function fetchFilterOptions(
+  filters: FilterState = {},
+): Promise<FilterOptionsResponse> {
+  return get<FilterOptionsResponse>(`/api/filter-options${qs(filterParams(filters))}`);
 }
 
 export async function fetchInstitutionProfile(id: string): Promise<InstitutionProfile> {

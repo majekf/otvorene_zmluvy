@@ -53,7 +53,24 @@ export default function GlobalView() {
     (searchParams.get('entity') as EntityType) || 'institutions',
   );
   const [metric, setMetric] = useState(searchParams.get('metric') || 'total_spend');
-  const { filters, setFilters, institutions, categories, vendors, awardTypes } = useFilterContext();
+  const {
+    filters,
+    setFilters,
+    institutions,
+    categories,
+    vendors,
+    institutionIcos,
+    vendorIcos,
+    institutionIcoMap,
+    vendorIcoMap,
+    institutionCounts,
+    vendorCounts,
+    institutionIcoCounts,
+    vendorIcoCounts,
+    categoryCounts,
+    awardTypes,
+    optionsLoaded,
+  } = useFilterContext();
   const [rankings, setRankings] = useState<RankingItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -68,6 +85,9 @@ export default function GlobalView() {
     if (filters.date_from) params.set('date_from', filters.date_from);
     if (filters.date_to) params.set('date_to', filters.date_to);
     if (filters.categories?.length) params.set('categories', filters.categories.join('|'));
+    if (filters.vendors?.length) params.set('vendors', filters.vendors.join('|'));
+    if (filters.institution_icos?.length) params.set('institution_icos', filters.institution_icos.join('|'));
+    if (filters.vendor_icos?.length) params.set('vendor_icos', filters.vendor_icos.join('|'));
     setSearchParams(params, { replace: true });
   }, [entity, metric, filters, setSearchParams]);
 
@@ -128,7 +148,17 @@ export default function GlobalView() {
         institutions={institutions}
         categories={categories}
         vendors={vendors}
+        institutionIcos={institutionIcos}
+        vendorIcos={vendorIcos}
+        institutionIcoMap={institutionIcoMap}
+        vendorIcoMap={vendorIcoMap}
+        institutionCounts={institutionCounts}
+        vendorCounts={vendorCounts}
+        institutionIcoCounts={institutionIcoCounts}
+        vendorIcoCounts={vendorIcoCounts}
+        categoryCounts={categoryCounts}
         awardTypes={awardTypes}
+        optionsLoaded={optionsLoaded}
       />
 
       {/* Controls */}

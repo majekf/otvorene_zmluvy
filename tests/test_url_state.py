@@ -21,6 +21,7 @@ class TestUrlStateFull:
             date_to="2025-12-31",
             categories=["construction", "IT"],
             vendors=["STRABAG s.r.o."],
+            icos=["12345678"],
             value_min=10_000.0,
             value_max=500_000.0,
             award_types=["direct_award"],
@@ -41,6 +42,7 @@ class TestUrlStateFull:
         assert encoded["date_to"] == "2025-12-31"
         assert encoded["categories"] == "construction|IT"
         assert encoded["vendors"] == "STRABAG s.r.o."
+        assert encoded["icos"] == "12345678"
         assert encoded["value_min"] == "10000.0"
         assert encoded["value_max"] == "500000.0"
         assert encoded["award_types"] == "direct_award"

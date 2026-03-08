@@ -24,7 +24,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { FilterState } from './types';
-import { fetchAggregations } from './api';
+import { fetchAggregations, fetchInstitutions, fetchVendors, fetchFilterOptions } from './api';
 import { parseUrlState } from './url-state';
 
 // ── Context shape ──────────────────────────────────────────────────
@@ -39,6 +39,15 @@ export interface FilterContextValue {
   institutions: string[];
   categories: string[];
   vendors: string[];
+  institutionIcos: string[];
+  vendorIcos: string[];
+  institutionIcoMap: Record<string, string>;
+  vendorIcoMap: Record<string, string>;
+  institutionCounts: Record<string, number>;
+  vendorCounts: Record<string, number>;
+  institutionIcoCounts: Record<string, number>;
+  vendorIcoCounts: Record<string, number>;
+  categoryCounts: Record<string, number>;
   awardTypes: string[];
   optionsLoaded: boolean;
 }
@@ -57,37 +66,101 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [institutions, setInstitutions] = useState<string[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [vendors, setVendors] = useState<string[]>([]);
+  const [institutionIcos, setInstitutionIcos] = useState<string[]>([]);
+  const [vendorIcos, setVendorIcos] = useState<string[]>([]);
+  const [institutionIcoMap, setInstitutionIcoMap] = useState<Record<string, string>>({});
+  const [vendorIcoMap, setVendorIcoMap] = useState<Record<string, string>>({});
+  const [institutionCounts, setInstitutionCounts] = useState<Record<string, number>>({});
+  const [vendorCounts, setVendorCounts] = useState<Record<string, number>>({});
+  const [institutionIcoCounts, setInstitutionIcoCounts] = useState<Record<string, number>>({});
+  const [vendorIcoCounts, setVendorIcoCounts] = useState<Record<string, number>>({});
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
   const [awardTypes, setAwardTypes] = useState<string[]>([]);
   const [optionsLoaded, setOptionsLoaded] = useState(false);
 
-  // Fetch dropdown options exactly once.
+  // Fetch name->ICO maps once from JSON-backed endpoints.
   const fetchedRef = useRef(false);
   useEffect(() => {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
 
-    Promise.all([
-      fetchAggregations({}, 'buyer'),
-      fetchAggregations({}, 'category'),
-      fetchAggregations({}, 'supplier'),
-      fetchAggregations({}, 'award_type'),
-    ])
-      .then(([instRes, catRes, vendRes, awardRes]) => {
-        setInstitutions(instRes.results.map((r) => r.group_value));
-        setCategories(catRes.results.map((r) => r.group_value));
-        setVendors(vendRes.results.map((r) => r.group_value));
+    Promise.all([fetchInstitutions(), fetchVendors(), fetchAggregations({}, 'award_type'), fetchFilterOptions({})])
+      .then(([instRes, vendRes, awardRes, optionsRes]) => {
+        const instMap: Record<string, string> = {};
+        const vendMap: Record<string, string> = {};
+        for (const r of instRes.institutions) if (r.ico) instMap[r.name] = r.ico;
+        for (const r of vendRes.vendors) if (r.ico) vendMap[r.name] = r.ico;
+        setInstitutions(optionsRes.institutions.map((o) => o.value));
+        setVendors(optionsRes.vendors.map((o) => o.value));
+        setInstitutionIcos(optionsRes.institution_icos.map((o) => o.value));
+        setVendorIcos(optionsRes.vendor_icos.map((o) => o.value));
+        setCategories(optionsRes.categories.map((o) => o.value));
+        setInstitutionIcoMap(instMap);
+        setVendorIcoMap(vendMap);
         setAwardTypes(awardRes.results.map((r) => r.group_value));
-        setOptionsLoaded(true);
       })
       .catch(() => {
-        // Non-fatal — dropdowns will be empty but the app still works.
-        setOptionsLoaded(true);
+        // Non-fatal; dynamic options still load from /api/filter-options.
       });
   }, []);
 
+  // Dynamic slicer options + counts. Each dimension is already
+  // cross-filtered server-side (self-filter excluded).
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchFilterOptions(filters)
+      .then((res) => {
+        if (cancelled) return;
+        const mergeSelected = (base: string[], selected?: string[]) =>
+          Array.from(new Set([...(selected || []), ...base]));
+
+        const inst = mergeSelected(res.institutions.map((o) => o.value), filters.institutions);
+        const vend = mergeSelected(res.vendors.map((o) => o.value), filters.vendors);
+        const instIco = mergeSelected(res.institution_icos.map((o) => o.value), filters.institution_icos);
+        const vendIco = mergeSelected(res.vendor_icos.map((o) => o.value), filters.vendor_icos);
+        const cat = mergeSelected(res.categories.map((o) => o.value), filters.categories);
+        setInstitutions(inst);
+        setVendors(vend);
+        setInstitutionIcos(instIco);
+        setVendorIcos(vendIco);
+        setCategories(cat);
+        setInstitutionCounts(Object.fromEntries(res.institutions.map((o) => [o.value, o.count])));
+        setVendorCounts(Object.fromEntries(res.vendors.map((o) => [o.value, o.count])));
+        setInstitutionIcoCounts(Object.fromEntries(res.institution_icos.map((o) => [o.value, o.count])));
+        setVendorIcoCounts(Object.fromEntries(res.vendor_icos.map((o) => [o.value, o.count])));
+        setCategoryCounts(Object.fromEntries(res.categories.map((o) => [o.value, o.count])));
+        setOptionsLoaded(true);
+      })
+      .catch(() => {
+        if (!cancelled) setOptionsLoaded(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filters]);
+
   return (
     <FilterContext.Provider
-      value={{ filters, setFilters, institutions, categories, vendors, awardTypes, optionsLoaded }}
+      value={{
+        filters,
+        setFilters,
+        institutions,
+        categories,
+        vendors,
+        institutionIcos,
+        vendorIcos,
+        institutionIcoMap,
+        vendorIcoMap,
+        institutionCounts,
+        vendorCounts,
+        institutionIcoCounts,
+        vendorIcoCounts,
+        categoryCounts,
+        awardTypes,
+        optionsLoaded,
+      }}
     >
       {children}
     </FilterContext.Provider>

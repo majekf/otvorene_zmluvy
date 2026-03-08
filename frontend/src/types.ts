@@ -34,6 +34,9 @@ export interface FilterState {
   date_to?: string;
   categories?: string[];
   vendors?: string[];
+  institution_icos?: string[];
+  vendor_icos?: string[];
+  icos?: string[];
   value_min?: number;
   value_max?: number;
   award_types?: string[];
@@ -232,6 +235,19 @@ export interface CustomRuleResponse {
   total_matched: number;
   total_evaluated: number;
   contracts: Contract[];
+}
+
+export interface SlicerOption {
+  value: string;
+  count: number;
+}
+
+export interface FilterOptionsResponse {
+  institutions: SlicerOption[];
+  vendors: SlicerOption[];
+  institution_icos: SlicerOption[];
+  vendor_icos: SlicerOption[];
+  categories: SlicerOption[];
 }
 
 // ── Phase 5: Chatbot types ──────────────────────────────────────────

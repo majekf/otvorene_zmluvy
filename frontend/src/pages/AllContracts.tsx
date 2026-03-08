@@ -35,7 +35,17 @@ export default function AllContracts() {
     institutions: distinctInstitutions,
     categories: distinctCategories,
     vendors: distinctVendors,
+    institutionIcos,
+    vendorIcos,
+    institutionIcoMap,
+    vendorIcoMap,
+    institutionCounts,
+    vendorCounts,
+    institutionIcoCounts,
+    vendorIcoCounts,
+    categoryCounts,
     awardTypes: distinctAwardTypes,
+    optionsLoaded,
   } = useFilterContext();
 
   const [sort, setSort] = useState<SortSpec>(urlState.sort);
@@ -110,7 +120,17 @@ export default function AllContracts() {
         institutions={distinctInstitutions}
         categories={distinctCategories}
         vendors={distinctVendors}
+        institutionIcos={institutionIcos}
+        vendorIcos={vendorIcos}
+        institutionIcoMap={institutionIcoMap}
+        vendorIcoMap={vendorIcoMap}
+        institutionCounts={institutionCounts}
+        vendorCounts={vendorCounts}
+        institutionIcoCounts={institutionIcoCounts}
+        vendorIcoCounts={vendorIcoCounts}
+        categoryCounts={categoryCounts}
         awardTypes={distinctAwardTypes}
+        optionsLoaded={optionsLoaded}
       />
 
       {/* Workspace toolbar: Share, Save, Export CSV, Export PDF */}

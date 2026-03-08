@@ -119,6 +119,15 @@ class FilterState(BaseModel):
     vendors: Optional[List[str]] = Field(
         default=None, description="Selected vendor/supplier name(s)"
     )
+    institution_icos: Optional[List[str]] = Field(
+        default=None, description="Selected IČO value(s) for institutions (ico_buyer)"
+    )
+    vendor_icos: Optional[List[str]] = Field(
+        default=None, description="Selected IČO value(s) for vendors (ico_supplier)"
+    )
+    icos: Optional[List[str]] = Field(
+        default=None, description="Deprecated: selected ICO value(s) for buyer or supplier"
+    )
     value_min: Optional[float] = Field(
         default=None, description="Minimum contract value (EUR)"
     )

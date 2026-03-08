@@ -129,6 +129,20 @@ class DataStore:
 
     # ── Filtering ────────────────────────────────────────────────────
 
+    @staticmethod
+    def _category_label(contract: Contract) -> str:
+        """Resolve category label with robust fallback to raw JSON fields."""
+        data = contract.model_dump()
+        lookup = {str(k).lower(): v for k, v in data.items()}
+        for key in ("rezort", "resort", "category"):
+            val = lookup.get(key)
+            if val is None:
+                continue
+            text = str(val).strip()
+            if text and text != "not_decided":
+                return text
+        return ""
+
     def filter(self, filters: FilterState) -> List[Contract]:
         """
         Apply shared global filters and return matching contracts.
@@ -156,11 +170,40 @@ class DataStore:
 
         if filters.categories:
             cat_set = set(filters.categories)
-            result = [c for c in result if c.category in cat_set]
+            result = [
+                c
+                for c in result
+                if self._category_label(c) in cat_set
+            ]
 
         if filters.vendors:
             vendor_set = set(filters.vendors)
             result = [c for c in result if c.supplier in vendor_set]
+
+        if filters.institution_icos:
+            inst_ico_set = set(filters.institution_icos)
+            result = [
+                c
+                for c in result
+                if c.ico_buyer and c.ico_buyer in inst_ico_set
+            ]
+
+        if filters.vendor_icos:
+            vendor_ico_set = set(filters.vendor_icos)
+            result = [
+                c
+                for c in result
+                if c.ico_supplier and c.ico_supplier in vendor_ico_set
+            ]
+
+        if filters.icos:
+            ico_set = set(filters.icos)
+            result = [
+                c
+                for c in result
+                if (c.ico_buyer and c.ico_buyer in ico_set)
+                or (c.ico_supplier and c.ico_supplier in ico_set)
+            ]
 
         if filters.value_min is not None:
             result = [
@@ -240,8 +283,7 @@ class DataStore:
 
         return dict(groups)
 
-    @staticmethod
-    def _extract_group_key(contract: Contract, field: str) -> Optional[str]:
+    def _extract_group_key(self, contract: Contract, field: str) -> Optional[str]:
         """Extract the grouping key from a contract."""
         if field == "month":
             if contract.published_date:
@@ -252,7 +294,7 @@ class DataStore:
         elif field == "buyer":
             return contract.buyer
         elif field == "category":
-            return contract.category
+            return self._category_label(contract) or None
         elif field == "award_type":
             return contract.award_type
         elif field == "published_year":

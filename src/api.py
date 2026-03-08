@@ -11,6 +11,7 @@ and contextual chatbot.
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+from collections import defaultdict
 
 import asyncio
 import base64
@@ -128,6 +129,15 @@ def parse_filters(
     vendors: Optional[str] = Query(
         None, description="Pipe-separated supplier names"
     ),
+    institution_icos: Optional[str] = Query(
+        None, description="Pipe-separated institution IČO values (ico_buyer)"
+    ),
+    vendor_icos: Optional[str] = Query(
+        None, description="Pipe-separated vendor IČO values (ico_supplier)"
+    ),
+    icos: Optional[str] = Query(
+        None, description="Pipe-separated ICO values"
+    ),
     value_min: Optional[float] = Query(
         None, description="Minimum EUR value"
     ),
@@ -153,6 +163,17 @@ def parse_filters(
         date_to=date_to,
         categories=categories.split("|") if categories else None,
         vendors=vendors.split("|") if vendors else None,
+        institution_icos=(
+            institution_icos.split("|")
+            if institution_icos
+            else (icos.split("|") if icos else None)
+        ),
+        vendor_icos=(
+            vendor_icos.split("|")
+            if vendor_icos
+            else (icos.split("|") if icos else None)
+        ),
+        icos=icos.split("|") if icos else None,
         value_min=value_min,
         value_max=value_max,
         award_types=(
@@ -224,6 +245,12 @@ def encode_filter_state(
         params["categories"] = "|".join(fs.categories)
     if fs.vendors:
         params["vendors"] = "|".join(fs.vendors)
+    if fs.institution_icos:
+        params["institution_icos"] = "|".join(fs.institution_icos)
+    if fs.vendor_icos:
+        params["vendor_icos"] = "|".join(fs.vendor_icos)
+    if fs.icos:
+        params["icos"] = "|".join(fs.icos)
     if fs.value_min is not None:
         params["value_min"] = str(fs.value_min)
     if fs.value_max is not None:
@@ -270,6 +297,55 @@ def list_contracts(
         "page_size": page_size,
         "total_pages": total_pages,
         "contracts": [c.model_dump() for c in all_contracts[start:end]],
+    }
+
+
+@app.get("/api/filter-options")
+def filter_options(
+    filters: FilterState = Depends(parse_filters),
+    store: DataStore = Depends(get_store),
+):
+    """Return slicer options with counts, cross-filtered like BI slicers."""
+    inst_scope = store.filter(_without_field(filters, "institutions"))
+    inst_counts: Dict[str, int] = defaultdict(int)
+    for c in inst_scope:
+        if c.buyer:
+            inst_counts[c.buyer] += 1
+
+    vendor_scope = store.filter(_without_field(filters, "vendors"))
+    vendor_counts: Dict[str, int] = defaultdict(int)
+    for c in vendor_scope:
+        if c.supplier:
+            vendor_counts[c.supplier] += 1
+
+    inst_ico_scope = store.filter(_without_field(filters, "institution_icos"))
+    inst_ico_counts: Dict[str, int] = defaultdict(int)
+    for c in inst_ico_scope:
+        if c.ico_buyer:
+            inst_ico_counts[c.ico_buyer] += 1
+
+    vendor_ico_scope = store.filter(_without_field(filters, "vendor_icos"))
+    vendor_ico_counts: Dict[str, int] = defaultdict(int)
+    for c in vendor_ico_scope:
+        if c.ico_supplier:
+            vendor_ico_counts[c.ico_supplier] += 1
+
+    cat_scope = store.filter(_without_field(filters, "categories"))
+    cat_counts: Dict[str, int] = defaultdict(int)
+    for c in cat_scope:
+        cat = store._category_label(c)
+        if cat:
+            cat_counts[cat] += 1
+
+    def pack(d: Dict[str, int]) -> List[Dict[str, Any]]:
+        return [{"value": key, "count": d[key]} for key in sorted(d.keys())]
+
+    return {
+        "institutions": pack(inst_counts),
+        "vendors": pack(vendor_counts),
+        "institution_icos": pack(inst_ico_counts),
+        "vendor_icos": pack(vendor_ico_counts),
+        "categories": pack(cat_counts),
     }
 
 
@@ -686,6 +762,17 @@ def list_vendors(store: DataStore = Depends(get_store)):
     }
 
 
+@app.get("/api/categories")
+def list_categories(store: DataStore = Depends(get_store)):
+    """List unique category labels sourced from raw JSON 'rezort' field."""
+    vals: set[str] = set()
+    for c in store.contracts:
+        cat = store._category_label(c)
+        if cat:
+            vals.add(cat)
+    return {"categories": sorted(vals)}
+
+
 @app.get("/api/vendors/{identifier}")
 def get_vendor(
     identifier: str,
@@ -1077,6 +1164,13 @@ def _parse_filters_from_dict(d: Dict[str, Any]) -> FilterState:
         for k, v in d.items()
         if k in FilterState.model_fields and v is not None
     })
+
+
+def _without_field(fs: FilterState, field: str) -> FilterState:
+    """Return a copy of FilterState with one field unset."""
+    data = fs.model_dump()
+    data[field] = None
+    return FilterState(**data)
 
 
 @app.get("/api/chat/status")

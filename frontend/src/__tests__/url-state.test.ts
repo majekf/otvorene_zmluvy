@@ -56,9 +56,10 @@ describe('parseUrlState', () => {
   });
 
   it('parses categories, vendors, award_types', () => {
-    const s = parseUrlState('categories=cat1%7Ccat2&vendors=v1&award_types=direct_award');
+    const s = parseUrlState('categories=cat1%7Ccat2&vendors=v1&icos=12345678&award_types=direct_award');
     expect(s.filters.categories).toEqual(['cat1', 'cat2']);
     expect(s.filters.vendors).toEqual(['v1']);
+    expect(s.filters.icos).toEqual(['12345678']);
     expect(s.filters.award_types).toEqual(['direct_award']);
   });
 });
@@ -106,6 +107,7 @@ describe('Full state encode/decode (Phase 7)', () => {
         date_to: '2025-12-31',
         categories: ['construction'],
         vendors: ['Vendor X'],
+        icos: ['12345678'],
         value_min: 10000,
         value_max: 500000,
         award_types: ['direct_award'],
@@ -125,6 +127,7 @@ describe('Full state encode/decode (Phase 7)', () => {
     expect(decoded.filters.date_to).toBe('2025-12-31');
     expect(decoded.filters.categories).toEqual(['construction']);
     expect(decoded.filters.vendors).toEqual(['Vendor X']);
+    expect(decoded.filters.icos).toEqual(['12345678']);
     expect(decoded.filters.value_min).toBe(10000);
     expect(decoded.filters.value_max).toBe(500000);
     expect(decoded.filters.award_types).toEqual(['direct_award']);
