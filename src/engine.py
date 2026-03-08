@@ -143,6 +143,34 @@ class DataStore:
                 return text
         return ""
 
+    @staticmethod
+    def _scanned_service_type(contract: Contract) -> str:
+        """Resolve scanned service type from raw JSON fields."""
+        data = contract.model_dump()
+        lookup = {str(k).lower(): v for k, v in data.items()}
+        for key in ("scanned_service_type", "service_type"):
+            val = lookup.get(key)
+            if val is None:
+                continue
+            text = str(val).strip()
+            if text:
+                return text
+        return ""
+
+    @staticmethod
+    def _scanned_service_subtype(contract: Contract) -> str:
+        """Resolve scanned service subtype from raw JSON fields."""
+        data = contract.model_dump()
+        lookup = {str(k).lower(): v for k, v in data.items()}
+        for key in ("scanned_service_subtype", "service_subtype"):
+            val = lookup.get(key)
+            if val is None:
+                continue
+            text = str(val).strip()
+            if text:
+                return text
+        return ""
+
     def filter(self, filters: FilterState) -> List[Contract]:
         """
         Apply shared global filters and return matching contracts.
@@ -174,6 +202,25 @@ class DataStore:
                 c
                 for c in result
                 if self._category_label(c) in cat_set
+            ]
+
+        if filters.scanned_service_types:
+            type_set = set(filters.scanned_service_types)
+            include_unassigned = "Nezaradené" in type_set
+            type_set.discard("Nezaradené")
+            result = [
+                c
+                for c in result
+                if (self._scanned_service_type(c) in type_set)
+                or (include_unassigned and not self._scanned_service_type(c))
+            ]
+
+        if filters.scanned_service_subtypes:
+            subtype_set = set(filters.scanned_service_subtypes)
+            result = [
+                c
+                for c in result
+                if self._scanned_service_subtype(c) in subtype_set
             ]
 
         if filters.vendors:
@@ -294,7 +341,8 @@ class DataStore:
         elif field == "buyer":
             return contract.buyer
         elif field == "category":
-            return self._category_label(contract) or None
+            # "Category" charts/grouping should follow scanned service categories only.
+            return self._scanned_service_type(contract) or "Nezaradené"
         elif field == "award_type":
             return contract.award_type
         elif field == "published_year":

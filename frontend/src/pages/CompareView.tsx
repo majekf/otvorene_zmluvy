@@ -27,7 +27,20 @@ const METRIC_OPTIONS: { id: CompareMetric; label: string }[] = [
 ];
 
 export default function CompareView() {
-  const { filters, setFilters, institutions, categories, vendors, awardTypes } = useFilterContext();
+  const {
+    filters,
+    setFilters,
+    institutions,
+    categories,
+    scannedServiceTypes,
+    scannedServiceSubtypes,
+    vendors,
+    categoryCounts,
+    scannedServiceTypeCounts,
+    scannedServiceSubtypeCounts,
+    awardTypes,
+    optionsLoaded,
+  } = useFilterContext();
   const [groupBy, setGroupBy] = useState<GroupByField>('category');
   const [metric, setMetric] = useState<CompareMetric>('total_spend');
   const [data, setData] = useState<CompareAggregationsResponse | null>(null);
@@ -47,6 +60,39 @@ export default function CompareView() {
     (f: Parameters<typeof setFilters>[0]) => setFilters(f),
     [setFilters],
   );
+
+  const applyGroupFilter = useCallback((groupValue: string) => {
+    if (!groupValue) return;
+    if (groupBy === 'buyer') {
+      setFilters({ ...filters, institutions: [groupValue], institution_icos: undefined });
+      return;
+    }
+    if (groupBy === 'supplier') {
+      setFilters({ ...filters, vendors: [groupValue], vendor_icos: undefined });
+      return;
+    }
+    if (groupBy === 'award_type') {
+      setFilters({ ...filters, award_types: [groupValue] });
+      return;
+    }
+    if (groupBy === 'category') {
+      setFilters({
+        ...filters,
+        scanned_service_types: [groupValue],
+        scanned_service_subtypes: undefined,
+      });
+      return;
+    }
+    if (groupBy === 'month' && /^\d{4}-\d{2}$/.test(groupValue)) {
+      const [y, m] = groupValue.split('-').map(Number);
+      const endDay = new Date(y, m, 0).getDate();
+      setFilters({
+        ...filters,
+        date_from: `${groupValue}-01`,
+        date_to: `${groupValue}-${String(endDay).padStart(2, '0')}`,
+      });
+    }
+  }, [filters, groupBy, setFilters]);
 
   const cs = data?.contracts_summary;
   const ss = data?.subcontractors_summary;
@@ -68,8 +114,14 @@ export default function CompareView() {
         onChange={handleFilterChange}
         institutions={institutions}
         categories={categories}
+        scannedServiceTypes={scannedServiceTypes}
+        scannedServiceSubtypes={scannedServiceSubtypes}
         vendors={vendors}
+        categoryCounts={categoryCounts}
+        scannedServiceTypeCounts={scannedServiceTypeCounts}
+        scannedServiceSubtypeCounts={scannedServiceSubtypeCounts}
         awardTypes={awardTypes}
+        optionsLoaded={optionsLoaded}
       />
 
       {/* Controls row */}
@@ -169,7 +221,7 @@ export default function CompareView() {
           <h2 className="section-title mb-4">
             {METRIC_OPTIONS.find((o) => o.id === metric)?.label ?? metric} by {groupBy}
           </h2>
-          <ClusteredBarChart data={data.data} metric={metric} />
+          <ClusteredBarChart data={data.data} metric={metric} onSelectGroup={applyGroupFilter} />
         </div>
       )}
 

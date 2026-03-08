@@ -34,6 +34,8 @@ export default function Dashboard() {
     setFilters,
     institutions: distinctInstitutions,
     categories: distinctCategories,
+    scannedServiceTypes,
+    scannedServiceSubtypes,
     vendors: distinctVendors,
     institutionIcos,
     vendorIcos,
@@ -44,6 +46,8 @@ export default function Dashboard() {
     institutionIcoCounts,
     vendorIcoCounts,
     categoryCounts,
+    scannedServiceTypeCounts,
+    scannedServiceSubtypeCounts,
     awardTypes: distinctAwardTypes,
     optionsLoaded,
   } = useFilterContext();
@@ -97,6 +101,39 @@ export default function Dashboard() {
     setFilters(newFilters);
   }, [setFilters]);
 
+  const applyGroupFilter = useCallback((groupValue: string) => {
+    if (!groupValue) return;
+    if (groupBy === 'buyer') {
+      setFilters({ ...filters, institutions: [groupValue], institution_icos: undefined });
+      return;
+    }
+    if (groupBy === 'supplier') {
+      setFilters({ ...filters, vendors: [groupValue], vendor_icos: undefined });
+      return;
+    }
+    if (groupBy === 'award_type') {
+      setFilters({ ...filters, award_types: [groupValue] });
+      return;
+    }
+    if (groupBy === 'category') {
+      setFilters({
+        ...filters,
+        scanned_service_types: [groupValue],
+        scanned_service_subtypes: undefined,
+      });
+      return;
+    }
+    if (groupBy === 'month' && /^\d{4}-\d{2}$/.test(groupValue)) {
+      const [y, m] = groupValue.split('-').map(Number);
+      const endDay = new Date(y, m, 0).getDate();
+      setFilters({
+        ...filters,
+        date_from: `${groupValue}-01`,
+        date_to: `${groupValue}-${String(endDay).padStart(2, '0')}`,
+      });
+    }
+  }, [filters, groupBy, setFilters]);
+
   return (
     <div data-testid="dashboard" className="space-y-8 animate-fade-in">
       {/* Filters */}
@@ -115,6 +152,10 @@ export default function Dashboard() {
         institutionIcoCounts={institutionIcoCounts}
         vendorIcoCounts={vendorIcoCounts}
         categoryCounts={categoryCounts}
+        scannedServiceTypes={scannedServiceTypes}
+        scannedServiceSubtypes={scannedServiceSubtypes}
+        scannedServiceTypeCounts={scannedServiceTypeCounts}
+        scannedServiceSubtypeCounts={scannedServiceSubtypeCounts}
         awardTypes={distinctAwardTypes}
         optionsLoaded={optionsLoaded}
       />
@@ -168,9 +209,9 @@ export default function Dashboard() {
       {/* Visualization */}
       <div className="chart-container">
       {vizMode === 'treemap' ? (
-        <TreemapChart data={treemapData} width={900} height={400} />
+        <TreemapChart data={treemapData} width={900} height={400} onDrillDown={applyGroupFilter} />
       ) : aggregations ? (
-        <BarChart data={aggregations.results} metric="total_spend" />
+        <BarChart data={aggregations.results} metric="total_spend" onSelectGroup={applyGroupFilter} />
       ) : null}
       </div>
 

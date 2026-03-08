@@ -153,6 +153,12 @@ def parse_filters(
     categories: Optional[str] = Query(
         None, description="Pipe-separated categories"
     ),
+    scanned_service_types: Optional[str] = Query(
+        None, description="Pipe-separated scanned service types"
+    ),
+    scanned_service_subtypes: Optional[str] = Query(
+        None, description="Pipe-separated scanned service subtypes"
+    ),
     vendors: Optional[str] = Query(
         None, description="Pipe-separated supplier names"
     ),
@@ -189,6 +195,12 @@ def parse_filters(
         date_from=date_from,
         date_to=date_to,
         categories=categories.split("|") if categories else None,
+        scanned_service_types=(
+            scanned_service_types.split("|") if scanned_service_types else None
+        ),
+        scanned_service_subtypes=(
+            scanned_service_subtypes.split("|") if scanned_service_subtypes else None
+        ),
         vendors=vendors.split("|") if vendors else None,
         institution_icos=(
             institution_icos.split("|")
@@ -270,6 +282,10 @@ def encode_filter_state(
         params["date_to"] = fs.date_to
     if fs.categories:
         params["categories"] = "|".join(fs.categories)
+    if fs.scanned_service_types:
+        params["scanned_service_types"] = "|".join(fs.scanned_service_types)
+    if fs.scanned_service_subtypes:
+        params["scanned_service_subtypes"] = "|".join(fs.scanned_service_subtypes)
     if fs.vendors:
         params["vendors"] = "|".join(fs.vendors)
     if fs.institution_icos:
@@ -364,6 +380,20 @@ def filter_options(
         if cat:
             cat_counts[cat] += 1
 
+    service_type_scope = store.filter(_without_field(filters, "scanned_service_types"))
+    service_type_counts: Dict[str, int] = defaultdict(int)
+    for c in service_type_scope:
+        service_type = store._scanned_service_type(c)
+        if service_type:
+            service_type_counts[service_type] += 1
+
+    service_subtype_scope = store.filter(_without_field(filters, "scanned_service_subtypes"))
+    service_subtype_counts: Dict[str, int] = defaultdict(int)
+    for c in service_subtype_scope:
+        service_subtype = store._scanned_service_subtype(c)
+        if service_subtype:
+            service_subtype_counts[service_subtype] += 1
+
     def pack(d: Dict[str, int]) -> List[Dict[str, Any]]:
         return [{"value": key, "count": d[key]} for key in sorted(d.keys())]
 
@@ -373,6 +403,8 @@ def filter_options(
         "institution_icos": pack(inst_ico_counts),
         "vendor_icos": pack(vendor_ico_counts),
         "categories": pack(cat_counts),
+        "scanned_service_types": pack(service_type_counts),
+        "scanned_service_subtypes": pack(service_subtype_counts),
     }
 
 
@@ -556,6 +588,8 @@ def get_benchmark(
         date_from=filters.date_from,
         date_to=filters.date_to,
         categories=filters.categories,
+        scanned_service_types=filters.scanned_service_types,
+        scanned_service_subtypes=filters.scanned_service_subtypes,
         vendors=filters.vendors,
         value_min=filters.value_min,
         value_max=filters.value_max,
@@ -600,6 +634,8 @@ def get_benchmark_peers(
         date_from=filters.date_from,
         date_to=filters.date_to,
         categories=filters.categories,
+        scanned_service_types=filters.scanned_service_types,
+        scanned_service_subtypes=filters.scanned_service_subtypes,
         vendors=filters.vendors,
         value_min=filters.value_min,
         value_max=filters.value_max,
@@ -634,6 +670,8 @@ def get_benchmark_compare(
         date_from=filters.date_from,
         date_to=filters.date_to,
         categories=filters.categories,
+        scanned_service_types=filters.scanned_service_types,
+        scanned_service_subtypes=filters.scanned_service_subtypes,
         vendors=filters.vendors,
         value_min=filters.value_min,
         value_max=filters.value_max,

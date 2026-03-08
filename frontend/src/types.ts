@@ -36,6 +36,8 @@ export interface FilterState {
   date_from?: string;
   date_to?: string;
   categories?: string[];
+  scanned_service_types?: string[];
+  scanned_service_subtypes?: string[];
   vendors?: string[];
   institution_icos?: string[];
   vendor_icos?: string[];
@@ -285,6 +287,8 @@ export interface FilterOptionsResponse {
   institution_icos: SlicerOption[];
   vendor_icos: SlicerOption[];
   categories: SlicerOption[];
+  scanned_service_types: SlicerOption[];
+  scanned_service_subtypes: SlicerOption[];
 }
 
 // ── Phase 5: Chatbot types ──────────────────────────────────────────

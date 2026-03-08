@@ -14,6 +14,8 @@ interface FilterBarProps {
   onChange: (filters: FilterState) => void;
   institutions?: string[];
   categories?: string[];
+  scannedServiceTypes?: string[];
+  scannedServiceSubtypes?: string[];
   vendors?: string[];
   institutionIcos?: string[];
   vendorIcos?: string[];
@@ -24,6 +26,8 @@ interface FilterBarProps {
   institutionIcoCounts?: Record<string, number>;
   vendorIcoCounts?: Record<string, number>;
   categoryCounts?: Record<string, number>;
+  scannedServiceTypeCounts?: Record<string, number>;
+  scannedServiceSubtypeCounts?: Record<string, number>;
   awardTypes?: string[];
   optionsLoaded?: boolean;
 }
@@ -66,6 +70,8 @@ export default function FilterBar({
   onChange,
   institutions = [],
   categories = [],
+  scannedServiceTypes = [],
+  scannedServiceSubtypes = [],
   vendors = [],
   institutionIcos = [],
   vendorIcos = [],
@@ -76,6 +82,8 @@ export default function FilterBar({
   institutionIcoCounts = {},
   vendorIcoCounts = {},
   categoryCounts = {},
+  scannedServiceTypeCounts = {},
+  scannedServiceSubtypeCounts = {},
   awardTypes = ['direct_award', 'open_tender', 'negotiated', 'unknown'],
   optionsLoaded = false,
 }: FilterBarProps) {
@@ -89,24 +97,32 @@ export default function FilterBar({
   const [institutionIcoSearch, setInstitutionIcoSearch] = useState('');
   const [vendorIcoSearch, setVendorIcoSearch] = useState('');
   const [categorySearch, setCategorySearch] = useState('');
+  const [serviceTypeSearch, setServiceTypeSearch] = useState('');
+  const [serviceSubtypeSearch, setServiceSubtypeSearch] = useState('');
 
   const [institutionOpen, setInstitutionOpen] = useState(false);
   const [vendorOpen, setVendorOpen] = useState(false);
   const [institutionIcoOpen, setInstitutionIcoOpen] = useState(false);
   const [vendorIcoOpen, setVendorIcoOpen] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
+  const [serviceTypeOpen, setServiceTypeOpen] = useState(false);
+  const [serviceSubtypeOpen, setServiceSubtypeOpen] = useState(false);
 
   const institutionRef = useRef<HTMLDivElement | null>(null);
   const vendorRef = useRef<HTMLDivElement | null>(null);
   const institutionIcoRef = useRef<HTMLDivElement | null>(null);
   const vendorIcoRef = useRef<HTMLDivElement | null>(null);
   const categoryRef = useRef<HTMLDivElement | null>(null);
+  const serviceTypeRef = useRef<HTMLDivElement | null>(null);
+  const serviceSubtypeRef = useRef<HTMLDivElement | null>(null);
 
   const sortedInstitutions = useMemo(() => sortAlpha(institutions), [institutions]);
   const sortedVendors = useMemo(() => sortAlpha(vendors), [vendors]);
   const sortedInstitutionIcos = useMemo(() => sortAlpha(institutionIcos), [institutionIcos]);
   const sortedVendorIcos = useMemo(() => sortAlpha(vendorIcos), [vendorIcos]);
   const sortedCategories = useMemo(() => sortAlpha(categories), [categories]);
+  const sortedServiceTypes = useMemo(() => sortAlpha(scannedServiceTypes), [scannedServiceTypes]);
+  const sortedServiceSubtypes = useMemo(() => sortAlpha(scannedServiceSubtypes), [scannedServiceSubtypes]);
 
   const filteredInstitutions = useMemo(
     () => rankAndFilter(sortedInstitutions, institutionSearch),
@@ -128,12 +144,22 @@ export default function FilterBar({
     () => rankAndFilter(sortedCategories, categorySearch),
     [sortedCategories, categorySearch],
   );
+  const filteredServiceTypes = useMemo(
+    () => rankAndFilter(sortedServiceTypes, serviceTypeSearch),
+    [sortedServiceTypes, serviceTypeSearch],
+  );
+  const filteredServiceSubtypes = useMemo(
+    () => rankAndFilter(sortedServiceSubtypes, serviceSubtypeSearch),
+    [sortedServiceSubtypes, serviceSubtypeSearch],
+  );
   const anySlicerActive =
     (filters.institutions?.length || 0) > 0 ||
     (filters.institution_icos?.length || 0) > 0 ||
     (filters.vendors?.length || 0) > 0 ||
     (filters.vendor_icos?.length || 0) > 0 ||
-    (filters.categories?.length || 0) > 0;
+    (filters.categories?.length || 0) > 0 ||
+    (filters.scanned_service_types?.length || 0) > 0 ||
+    (filters.scanned_service_subtypes?.length || 0) > 0;
   const availableInstitutions = useMemo(
     () => sortedInstitutions.filter((name) => (institutionCounts[name] ?? 0) > 0),
     [sortedInstitutions, institutionCounts],
@@ -154,25 +180,41 @@ export default function FilterBar({
     () => sortedCategories.filter((name) => (categoryCounts[name] ?? 0) > 0),
     [sortedCategories, categoryCounts],
   );
+  const availableServiceTypes = useMemo(
+    () => sortedServiceTypes.filter((name) => (scannedServiceTypeCounts[name] ?? 0) > 0),
+    [sortedServiceTypes, scannedServiceTypeCounts],
+  );
+  const availableServiceSubtypes = useMemo(
+    () => sortedServiceSubtypes.filter((name) => (scannedServiceSubtypeCounts[name] ?? 0) > 0),
+    [sortedServiceSubtypes, scannedServiceSubtypeCounts],
+  );
   const effectiveInstitutions = useMemo(
-    () => (filters.institutions?.length ? filters.institutions : anySlicerActive ? availableInstitutions : []),
+    () => (filters.institutions !== undefined ? filters.institutions : anySlicerActive ? availableInstitutions : []),
     [filters.institutions, anySlicerActive, availableInstitutions],
   );
   const effectiveVendors = useMemo(
-    () => (filters.vendors?.length ? filters.vendors : anySlicerActive ? availableVendors : []),
+    () => (filters.vendors !== undefined ? filters.vendors : anySlicerActive ? availableVendors : []),
     [filters.vendors, anySlicerActive, availableVendors],
   );
   const effectiveInstitutionIcos = useMemo(
-    () => (filters.institution_icos?.length ? filters.institution_icos : anySlicerActive ? availableInstitutionIcos : []),
+    () => (filters.institution_icos !== undefined ? filters.institution_icos : anySlicerActive ? availableInstitutionIcos : []),
     [filters.institution_icos, anySlicerActive, availableInstitutionIcos],
   );
   const effectiveVendorIcos = useMemo(
-    () => (filters.vendor_icos?.length ? filters.vendor_icos : anySlicerActive ? availableVendorIcos : []),
+    () => (filters.vendor_icos !== undefined ? filters.vendor_icos : anySlicerActive ? availableVendorIcos : []),
     [filters.vendor_icos, anySlicerActive, availableVendorIcos],
   );
   const effectiveCategories = useMemo(
-    () => (filters.categories?.length ? filters.categories : anySlicerActive ? availableCategories : []),
+    () => (filters.categories !== undefined ? filters.categories : anySlicerActive ? availableCategories : []),
     [filters.categories, anySlicerActive, availableCategories],
+  );
+  const effectiveServiceTypes = useMemo(
+    () => (filters.scanned_service_types !== undefined ? filters.scanned_service_types : anySlicerActive ? availableServiceTypes : []),
+    [filters.scanned_service_types, anySlicerActive, availableServiceTypes],
+  );
+  const effectiveServiceSubtypes = useMemo(
+    () => (filters.scanned_service_subtypes !== undefined ? filters.scanned_service_subtypes : anySlicerActive ? availableServiceSubtypes : []),
+    [filters.scanned_service_subtypes, anySlicerActive, availableServiceSubtypes],
   );
   const orderedInstitutions = useMemo(
     () => selectedFirst(filteredInstitutions, effectiveInstitutions),
@@ -194,26 +236,46 @@ export default function FilterBar({
     () => selectedFirst(filteredCategories, effectiveCategories),
     [filteredCategories, effectiveCategories],
   );
+  const orderedServiceTypes = useMemo(
+    () => selectedFirst(filteredServiceTypes, effectiveServiceTypes),
+    [filteredServiceTypes, effectiveServiceTypes],
+  );
+  const orderedServiceSubtypes = useMemo(
+    () => selectedFirst(filteredServiceSubtypes, effectiveServiceSubtypes),
+    [filteredServiceSubtypes, effectiveServiceSubtypes],
+  );
   const selectedInstitutionIcoSet = useMemo(() => {
+    if (filters.institution_icos !== undefined) {
+      return new Set(filters.institution_icos);
+    }
     const out = new Set(effectiveInstitutionIcos);
     for (const name of effectiveInstitutions) {
       const ico = institutionIcoMap[name];
       if (ico) out.add(ico);
     }
     return out;
-  }, [effectiveInstitutionIcos, effectiveInstitutions, institutionIcoMap]);
+  }, [filters.institution_icos, effectiveInstitutionIcos, effectiveInstitutions, institutionIcoMap]);
   const selectedVendorIcoSet = useMemo(() => {
+    if (filters.vendor_icos !== undefined) {
+      return new Set(filters.vendor_icos);
+    }
     const out = new Set(effectiveVendorIcos);
     for (const name of effectiveVendors) {
       const ico = vendorIcoMap[name];
       if (ico) out.add(ico);
     }
     return out;
-  }, [effectiveVendorIcos, effectiveVendors, vendorIcoMap]);
+  }, [filters.vendor_icos, effectiveVendorIcos, effectiveVendors, vendorIcoMap]);
 
   useEffect(() => {
     setTextInput(filters.text_search || '');
   }, [filters.text_search]);
+
+  useEffect(() => {
+    if ((filters.scanned_service_types?.length || 0) === 0 && (filters.scanned_service_subtypes?.length || 0) > 0) {
+      update({ scanned_service_subtypes: undefined });
+    }
+  }, [filters.scanned_service_types, filters.scanned_service_subtypes]);
 
   useEffect(() => {
     function onDocMouseDown(e: MouseEvent) {
@@ -223,6 +285,8 @@ export default function FilterBar({
       if (institutionIcoRef.current && !institutionIcoRef.current.contains(target)) setInstitutionIcoOpen(false);
       if (vendorIcoRef.current && !vendorIcoRef.current.contains(target)) setVendorIcoOpen(false);
       if (categoryRef.current && !categoryRef.current.contains(target)) setCategoryOpen(false);
+      if (serviceTypeRef.current && !serviceTypeRef.current.contains(target)) setServiceTypeOpen(false);
+      if (serviceSubtypeRef.current && !serviceSubtypeRef.current.contains(target)) setServiceSubtypeOpen(false);
     }
 
     document.addEventListener('mousedown', onDocMouseDown);
@@ -245,49 +309,53 @@ export default function FilterBar({
     setInstitutionIcoSearch('');
     setVendorIcoSearch('');
     setCategorySearch('');
+    setServiceTypeSearch('');
+    setServiceSubtypeSearch('');
     setInstitutionOpen(false);
     setVendorOpen(false);
     setInstitutionIcoOpen(false);
     setVendorIcoOpen(false);
     setCategoryOpen(false);
+    setServiceTypeOpen(false);
+    setServiceSubtypeOpen(false);
     onChange({});
   }
 
   function toggleInstitution(name: string) {
-    const selected = effectiveInstitutions;
+    const selected = filters.institutions ?? [];
     const nextInstitutions = selected.includes(name)
       ? selected.filter((i) => i !== name)
       : [...selected, name];
-    update({ institutions: nextInstitutions.length ? nextInstitutions : undefined });
+    update({ institutions: nextInstitutions });
   }
 
   function toggleVendor(name: string) {
-    const selected = effectiveVendors;
+    const selected = filters.vendors ?? [];
     const nextVendors = selected.includes(name)
       ? selected.filter((v) => v !== name)
       : [...selected, name];
-    update({ vendors: nextVendors.length ? nextVendors : undefined });
+    update({ vendors: nextVendors });
   }
 
   function toggleInstitutionIco(ico: string) {
-    const selected = Array.from(selectedInstitutionIcoSet);
+    const selected = filters.institution_icos ?? [];
     const nextIcos = selected.includes(ico)
       ? selected.filter((i) => i !== ico)
       : [...selected, ico];
 
     update({
-      institution_icos: nextIcos.length ? nextIcos : undefined,
+      institution_icos: nextIcos,
     });
   }
 
   function toggleVendorIco(ico: string) {
-    const selected = Array.from(selectedVendorIcoSet);
+    const selected = filters.vendor_icos ?? [];
     const nextIcos = selected.includes(ico)
       ? selected.filter((i) => i !== ico)
       : [...selected, ico];
 
     update({
-      vendor_icos: nextIcos.length ? nextIcos : undefined,
+      vendor_icos: nextIcos,
     });
   }
 
@@ -316,27 +384,27 @@ export default function FilterBar({
   }
 
   function clearInstitutions() {
-    update({ institutions: undefined });
+    update({ institutions: [] });
   }
 
   function clearVendors() {
-    update({ vendors: undefined });
+    update({ vendors: [] });
   }
 
   function clearInstitutionIcos() {
-    update({ institution_icos: undefined });
+    update({ institution_icos: [] });
   }
 
   function clearVendorIcos() {
-    update({ vendor_icos: undefined });
+    update({ vendor_icos: [] });
   }
 
   function toggleCategory(name: string) {
-    const selected = effectiveCategories;
+    const selected = filters.categories ?? [];
     const next = selected.includes(name)
       ? selected.filter((c) => c !== name)
       : [...selected, name];
-    update({ categories: next.length ? next : undefined });
+    update({ categories: next });
   }
 
   function selectAllCategories() {
@@ -345,7 +413,44 @@ export default function FilterBar({
   }
 
   function clearCategories() {
-    update({ categories: undefined });
+    update({ categories: [] });
+  }
+
+  function toggleServiceType(name: string) {
+    const selected = filters.scanned_service_types ?? [];
+    const next = selected.includes(name)
+      ? selected.filter((t) => t !== name)
+      : [...selected, name];
+    update({
+      scanned_service_types: next,
+      scanned_service_subtypes: next.length ? filters.scanned_service_subtypes : [],
+    });
+  }
+
+  function selectAllServiceTypes() {
+    const next = [...filteredServiceTypes];
+    update({ scanned_service_types: next.length ? next : undefined });
+  }
+
+  function clearServiceTypes() {
+    update({ scanned_service_types: [], scanned_service_subtypes: [] });
+  }
+
+  function toggleServiceSubtype(name: string) {
+    const selected = filters.scanned_service_subtypes ?? [];
+    const next = selected.includes(name)
+      ? selected.filter((t) => t !== name)
+      : [...selected, name];
+    update({ scanned_service_subtypes: next });
+  }
+
+  function selectAllServiceSubtypes() {
+    const next = [...filteredServiceSubtypes];
+    update({ scanned_service_subtypes: next.length ? next : undefined });
+  }
+
+  function clearServiceSubtypes() {
+    update({ scanned_service_subtypes: [] });
   }
 
   return (
@@ -360,7 +465,7 @@ export default function FilterBar({
         <span className="text-sm font-semibold text-slate-700">Filters</span>
       </div>
       <div className="flex flex-wrap gap-3 items-end">
-        <div className="flex flex-col min-w-[250px] relative z-40" ref={institutionRef}>
+        <div className={`flex flex-col min-w-[250px] relative ${institutionOpen ? 'z-[120]' : 'z-40'}`} ref={institutionRef}>
           <label className="text-xs font-semibold text-slate-500 mb-1.5 tracking-wide uppercase">Institution</label>
           <button type="button" data-testid="filter-institution-trigger" className="form-input text-left flex items-center justify-between" onClick={() => setInstitutionOpen((v) => !v)}>
             <span className="truncate">{effectiveInstitutions.length ? `Selected: ${effectiveInstitutions.length}` : 'All institutions'}</span>
@@ -395,10 +500,10 @@ export default function FilterBar({
           )}
         </div>
 
-        <div className="flex flex-col min-w-[180px] relative z-40" ref={institutionIcoRef}>
-          <label className="text-xs font-semibold text-slate-500 mb-1.5 tracking-wide uppercase">IČO Institution</label>
+        <div className={`flex flex-col min-w-[210px] relative ${institutionIcoOpen ? 'z-[120]' : 'z-40'}`} ref={institutionIcoRef}>
+          <label className="text-xs font-semibold text-slate-500 mb-1.5 tracking-wide uppercase">Institution IČO</label>
           <button type="button" data-testid="filter-institution-ico-trigger" className="form-input text-left flex items-center justify-between" onClick={() => setInstitutionIcoOpen((v) => !v)}>
-            <span className="truncate">{selectedInstitutionIcoSet.size ? `Selected: ${selectedInstitutionIcoSet.size}` : 'All institution IČO'}</span>
+            <span className="truncate">{selectedInstitutionIcoSet.size ? `Selected: ${selectedInstitutionIcoSet.size}` : 'All institution IDs'}</span>
             <span className="text-slate-400">{institutionIcoOpen ? '▴' : '▾'}</span>
           </button>
           {institutionIcoOpen && (
@@ -430,7 +535,7 @@ export default function FilterBar({
           )}
         </div>
 
-        <div className="flex flex-col min-w-[250px] relative z-40" ref={vendorRef}>
+        <div className={`flex flex-col min-w-[250px] relative ${vendorOpen ? 'z-[120]' : 'z-40'}`} ref={vendorRef}>
           <label className="text-xs font-semibold text-slate-500 mb-1.5 tracking-wide uppercase">Vendor</label>
           <button type="button" data-testid="filter-vendor-trigger" className="form-input text-left flex items-center justify-between" onClick={() => setVendorOpen((v) => !v)}>
             <span className="truncate">{effectiveVendors.length ? `Selected: ${effectiveVendors.length}` : 'All vendors'}</span>
@@ -465,7 +570,7 @@ export default function FilterBar({
           )}
         </div>
 
-        <div className="flex flex-col min-w-[180px] relative z-40" ref={vendorIcoRef}>
+        <div className={`flex flex-col min-w-[180px] relative ${vendorIcoOpen ? 'z-[120]' : 'z-40'}`} ref={vendorIcoRef}>
           <label className="text-xs font-semibold text-slate-500 mb-1.5 tracking-wide uppercase">IČO Vendor</label>
           <button type="button" data-testid="filter-vendor-ico-trigger" className="form-input text-left flex items-center justify-between" onClick={() => setVendorIcoOpen((v) => !v)}>
             <span className="truncate">{selectedVendorIcoSet.size ? `Selected: ${selectedVendorIcoSet.size}` : 'All vendor IČO'}</span>
@@ -500,15 +605,15 @@ export default function FilterBar({
           )}
         </div>
 
-        <div className="flex flex-col min-w-[220px] relative z-40" ref={categoryRef}>
-          <label className="text-xs font-semibold text-slate-500 mb-1.5 tracking-wide uppercase">Category</label>
+        <div data-testid="filter-category" className={`flex flex-col min-w-[220px] relative ${categoryOpen ? 'z-[120]' : 'z-40'}`} ref={categoryRef}>
+          <label className="text-xs font-semibold text-slate-500 mb-1.5 tracking-wide uppercase">Rezort</label>
           <button type="button" data-testid="filter-category-trigger" className="form-input text-left flex items-center justify-between" onClick={() => setCategoryOpen((v) => !v)}>
-            <span className="truncate">{effectiveCategories.length ? `Selected: ${effectiveCategories.length}` : 'All categories'}</span>
+            <span className="truncate">{effectiveCategories.length ? `Selected: ${effectiveCategories.length}` : 'All rezorts'}</span>
             <span className="text-slate-400">{categoryOpen ? '▴' : '▾'}</span>
           </button>
           {categoryOpen && (
             <div data-testid="filter-category-dropdown" className="absolute z-[100] top-[calc(100%+6px)] right-0 w-full max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
-              <input data-testid="filter-category-search" type="text" className="form-input mb-2 w-full min-w-0" placeholder="Search categories..." value={categorySearch} onChange={(e) => setCategorySearch(e.target.value)} />
+              <input data-testid="filter-category-search" type="text" className="form-input mb-2 w-full min-w-0" placeholder="Search rezorts..." value={categorySearch} onChange={(e) => setCategorySearch(e.target.value)} />
               <div className="mb-2 flex items-center justify-between text-xs">
                 <span data-testid="filter-category-selected-count" className="text-slate-500">Selected: {effectiveCategories.length}</span>
                 <div className="flex gap-2">
@@ -534,6 +639,78 @@ export default function FilterBar({
             </div>
           )}
         </div>
+
+        <div className={`flex flex-col min-w-[240px] relative ${serviceTypeOpen ? 'z-[120]' : 'z-40'}`} ref={serviceTypeRef}>
+          <label className="text-xs font-semibold text-slate-500 mb-1.5 tracking-wide uppercase">Category</label>
+          <button type="button" data-testid="filter-service-type-trigger" className="form-input text-left flex items-center justify-between" onClick={() => setServiceTypeOpen((v) => !v)}>
+            <span className="truncate">{effectiveServiceTypes.length ? `Selected: ${effectiveServiceTypes.length}` : 'All categories'}</span>
+            <span className="text-slate-400">{serviceTypeOpen ? '▴' : '▾'}</span>
+          </button>
+          {serviceTypeOpen && (
+            <div data-testid="filter-service-type-dropdown" className="absolute z-[100] top-[calc(100%+6px)] right-0 w-full max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+              <input data-testid="filter-service-type-search" type="text" className="form-input mb-2 w-full min-w-0" placeholder="Search categories..." value={serviceTypeSearch} onChange={(e) => setServiceTypeSearch(e.target.value)} />
+              <div className="mb-2 flex items-center justify-between text-xs">
+                <span data-testid="filter-service-type-selected-count" className="text-slate-500">Selected: {effectiveServiceTypes.length}</span>
+                <div className="flex gap-2">
+                  <button type="button" data-testid="filter-service-type-select-all" className="text-slate-600 hover:text-slate-900" onClick={selectAllServiceTypes}>Select all</button>
+                  <button type="button" data-testid="filter-service-type-clear" className="text-slate-600 hover:text-slate-900" onClick={clearServiceTypes}>Clear</button>
+                </div>
+              </div>
+              <div data-testid="filter-service-type-list" className="max-h-36 overflow-y-auto space-y-1 pr-1">
+                {orderedServiceTypes.length === 0 && <p className="text-xs text-slate-400 px-1 py-1">No matches</p>}
+                {orderedServiceTypes.map((t) => (
+                  <label key={t} className="flex items-center gap-2 text-sm text-slate-700 px-1 py-0.5">
+                    <input
+                      type="checkbox"
+                      checked={effectiveServiceTypes.includes(t)}
+                      disabled={optionsLoaded && (scannedServiceTypeCounts[t] ?? 0) === 0 && !effectiveServiceTypes.includes(t)}
+                      onChange={() => toggleServiceType(t)}
+                    />
+                    <span className="flex-1 truncate">{t}</span>
+                    <span className="text-xs text-slate-400 tabular-nums">{scannedServiceTypeCounts[t] ?? 0}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {(filters.scanned_service_types?.length || 0) > 0 && (
+          <div className={`flex flex-col min-w-[260px] relative ${serviceSubtypeOpen ? 'z-[120]' : 'z-40'}`} ref={serviceSubtypeRef}>
+            <label className="text-xs font-semibold text-slate-500 mb-1.5 tracking-wide uppercase">Detailed Category</label>
+            <button type="button" data-testid="filter-service-subtype-trigger" className="form-input text-left flex items-center justify-between" onClick={() => setServiceSubtypeOpen((v) => !v)}>
+              <span className="truncate">{effectiveServiceSubtypes.length ? `Selected: ${effectiveServiceSubtypes.length}` : 'All detailed categories'}</span>
+              <span className="text-slate-400">{serviceSubtypeOpen ? '▴' : '▾'}</span>
+            </button>
+            {serviceSubtypeOpen && (
+              <div data-testid="filter-service-subtype-dropdown" className="absolute z-[100] top-[calc(100%+6px)] right-0 w-full max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                <input data-testid="filter-service-subtype-search" type="text" className="form-input mb-2 w-full min-w-0" placeholder="Search detailed categories..." value={serviceSubtypeSearch} onChange={(e) => setServiceSubtypeSearch(e.target.value)} />
+                <div className="mb-2 flex items-center justify-between text-xs">
+                  <span data-testid="filter-service-subtype-selected-count" className="text-slate-500">Selected: {effectiveServiceSubtypes.length}</span>
+                  <div className="flex gap-2">
+                    <button type="button" data-testid="filter-service-subtype-select-all" className="text-slate-600 hover:text-slate-900" onClick={selectAllServiceSubtypes}>Select all</button>
+                    <button type="button" data-testid="filter-service-subtype-clear" className="text-slate-600 hover:text-slate-900" onClick={clearServiceSubtypes}>Clear</button>
+                  </div>
+                </div>
+                <div data-testid="filter-service-subtype-list" className="max-h-36 overflow-y-auto space-y-1 pr-1">
+                  {orderedServiceSubtypes.length === 0 && <p className="text-xs text-slate-400 px-1 py-1">No matches</p>}
+                  {orderedServiceSubtypes.map((s) => (
+                    <label key={s} className="flex items-center gap-2 text-sm text-slate-700 px-1 py-0.5">
+                      <input
+                        type="checkbox"
+                        checked={effectiveServiceSubtypes.includes(s)}
+                        disabled={optionsLoaded && (scannedServiceSubtypeCounts[s] ?? 0) === 0 && !effectiveServiceSubtypes.includes(s)}
+                        onChange={() => toggleServiceSubtype(s)}
+                      />
+                      <span className="flex-1 truncate">{s}</span>
+                      <span className="text-xs text-slate-400 tabular-nums">{scannedServiceSubtypeCounts[s] ?? 0}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex flex-col">
           <label className="text-xs font-semibold text-slate-500 mb-1.5 tracking-wide uppercase">Date from</label>

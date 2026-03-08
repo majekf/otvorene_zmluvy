@@ -178,11 +178,11 @@ describe('AccordionContracts', () => {
 
   // ── API call correctness ──────────────────────────────────────────
 
-  it('calls fetchContracts with category filter for groupBy=category', async () => {
+  it('calls fetchContracts with scanned category filter for groupBy=category', async () => {
     renderComponent({ groupBy: 'category', groupValue: 'construction' });
     await waitFor(() => {
       expect(api.fetchContracts).toHaveBeenCalledWith(
-        expect.objectContaining({ categories: ['construction'] }),
+        expect.objectContaining({ scanned_service_types: ['construction'] }),
         1,
         10,
         [],
@@ -249,7 +249,7 @@ describe('AccordionContracts', () => {
         expect.objectContaining({
           text_search: 'roads',
           value_min: 1000,
-          categories: ['construction'],
+          scanned_service_types: ['construction'],
         }),
         1,
         10,
@@ -283,9 +283,9 @@ describe('AccordionContracts', () => {
 // ── mergeGroupFilter unit tests ───────────────────────────────────
 
 describe('mergeGroupFilter', () => {
-  it('adds categories for groupBy=category', () => {
+  it('adds scanned_service_types for groupBy=category', () => {
     const result = mergeGroupFilter({}, 'category', 'construction');
-    expect(result.categories).toEqual(['construction']);
+    expect(result.scanned_service_types).toEqual(['construction']);
   });
 
   it('adds vendors for groupBy=supplier', () => {
@@ -326,7 +326,7 @@ describe('mergeGroupFilter', () => {
     const result = mergeGroupFilter(base, 'category', 'it');
     expect(result.text_search).toBe('roads');
     expect(result.value_min).toBe(5000);
-    expect(result.categories).toEqual(['it']);
+    expect(result.scanned_service_types).toEqual(['it']);
   });
 
   it('does not mutate the base filter', () => {
