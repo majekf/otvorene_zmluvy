@@ -472,6 +472,9 @@ def load_urls(args: argparse.Namespace) -> List[str]:
         file_lines = Path(args.urls_file).read_text(encoding="utf-8").splitlines()
         urls.extend(line.strip() for line in file_lines if line.strip())
 
+    if args.contracts_json:
+        urls.extend(load_josephine_urls_from_contracts(args.contracts_json))
+
     seen = set()
     unique_urls: List[str] = []
     for u in urls:
@@ -480,6 +483,47 @@ def load_urls(args: argparse.Namespace) -> List[str]:
         seen.add(u)
         unique_urls.append(u)
     return unique_urls
+
+
+def is_josephine_tender_url(url: str) -> bool:
+    """Return True only for JOSEPHINE tender summary links."""
+    if not url:
+        return False
+    return bool(
+        re.match(
+            r"^https?://josephine\.proebiz\.com/.*/tender/\d+/summary/?$",
+            url.strip(),
+            flags=re.IGNORECASE,
+        )
+    )
+
+
+def load_josephine_urls_from_contracts(contracts_json_path: str) -> List[str]:
+    """Load JOSEPHINE public_procurement_url values from contracts JSON."""
+    path = Path(contracts_json_path)
+    if not path.exists():
+        logger.warning("contracts_json file not found: %s", contracts_json_path)
+        return []
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning("Failed to read contracts_json %s: %s", contracts_json_path, exc)
+        return []
+
+    if not isinstance(payload, list):
+        logger.warning("contracts_json must contain a top-level list: %s", contracts_json_path)
+        return []
+
+    urls: List[str] = []
+    for row in payload:
+        if not isinstance(row, dict):
+            continue
+        value = row.get("public_procurement_url")
+        if isinstance(value, str) and is_josephine_tender_url(value):
+            urls.append(value.strip())
+
+    return urls
 
 
 def parse_args() -> argparse.Namespace:
@@ -496,6 +540,15 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         help="Text file containing one tender URL per line",
+    )
+    parser.add_argument(
+        "--contracts-json",
+        type=str,
+        default=None,
+        help=(
+            "Contracts JSON path; JOSEPHINE URLs are loaded from each "
+            "record's public_procurement_url"
+        ),
     )
     parser.add_argument(
         "--out",
@@ -556,8 +609,8 @@ def main() -> int:
 
     urls = load_urls(args)
     if not urls:
-        logger.error("No URLs provided. Use --url and/or --urls-file")
-        return 1
+        logger.warning("No JOSEPHINE tender URLs found. Nothing to do.")
+        return 0
 
     api_key = args.api_key or os.getenv("OPENAI_API_KEY")
     openai_client: Optional[OpenAI] = None
@@ -578,11 +631,34 @@ def main() -> int:
         }
     )
 
-    output_records: List[Dict[str, Any]] = []
+    out_path = Path(args.out)
+    existing_records: List[Dict[str, Any]] = []
+    known_tender_urls = set()
+
+    if out_path.exists():
+        existing_text = out_path.read_text(encoding="utf-8").strip()
+        if existing_text:
+            loaded = json.loads(existing_text)
+            if not isinstance(loaded, list):
+                raise ValueError(
+                    f"Existing output file {args.out} must contain a JSON array"
+                )
+            existing_records = loaded
+            known_tender_urls = {
+                str(item.get("tender_url"))
+                for item in existing_records
+                if isinstance(item, dict) and item.get("tender_url")
+            }
+
+    output_records: List[Dict[str, Any]] = list(existing_records)
     pdf_dir = Path(args.pdf_dir)
     pdf_dir.mkdir(parents=True, exist_ok=True)
 
     for url in urls:
+        if url in known_tender_urls:
+            logger.info("Skipping already saved tender URL: %s", url)
+            continue
+
         try:
             logger.info("Processing %s", url)
             tender = process_tender(
@@ -595,6 +671,7 @@ def main() -> int:
                 openai_model=args.openai_model,
             )
             output_records.append(tender)
+            known_tender_urls.add(url)
         except Exception as exc:
             logger.exception("Failed processing %s: %s", url, exc)
             output_records.append(
@@ -604,14 +681,19 @@ def main() -> int:
                 }
             )
 
-    out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(
         json.dumps(output_records, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
-    logger.info("Saved %d tenders to %s", len(output_records), out_path)
+    logger.info(
+        "Saved %d tenders to %s (existing=%d, added=%d)",
+        len(output_records),
+        out_path,
+        len(existing_records),
+        max(0, len(output_records) - len(existing_records)),
+    )
     return 0
 
 

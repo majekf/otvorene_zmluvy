@@ -65,6 +65,16 @@ SAMPLE_LISTING_HTML = """
 </table>
 """
 
+SAMPLE_LANDING_WITH_FILTER_ONLY_HTML = """
+<html>
+    <body>
+        <form id="frm_filter_3" action="/2171273-sk/centralny-register-zmluv/" method="get">
+            <input type="text" name="art_suma_spolu_od" value="1000000" />
+        </form>
+    </body>
+</html>
+"""
+
 # Sample HTML from contract detail page
 SAMPLE_DETAIL_HTML = """
 <header class="page__heading">
@@ -123,6 +133,14 @@ SAMPLE_DETAIL_HTML = """
                         <div class="row gx-3">
                             <strong class="col-sm-3 text-sm-end">ICO:</strong>
                             <span class="col-sm-9">36394556</span>
+                        </div>
+                    </li>
+                    <li class="py-2 border-top">
+                        <div class="row gx-3">
+                            <strong class="col-sm-3 text-sm-end">Verejne obstaravanie:</strong>
+                            <span class="col-sm-9">
+                                <a href="https://josephine.proebiz.com/sk/tender/65482/summary">Josephine</a>
+                            </span>
                         </div>
                     </li>
                 </ul>
@@ -214,8 +232,8 @@ class TestExtractListingRows:
 class TestExtractContractDetails:
     """Test contract detail extraction."""
 
-    def test_extract_dates_ids_and_identification_fields(self):
-        """Test extraction of dates, IDs, rezort, and full identification section."""
+    def test_extract_dates_ids_and_public_procurement_id(self):
+        """Test extraction of dates, IDs, rezort, and procurement link metadata."""
         details = extract_contract_details(
             SAMPLE_DETAIL_HTML,
             "https://example.com/zmluva/12048046/",
@@ -231,10 +249,10 @@ class TestExtractContractDetails:
         assert details.get("date_valid_until") is None
         assert details.get("ico_buyer") == "17336163"
         assert details.get("ico_supplier") == "36394556"
-
-        assert "identification_fields" in details
-        assert "identification_section_items" in details
-        assert details["identification_fields"]["Rezort"] == "Ministerstvo zdravotnictva Slovenskej republiky"
+        assert details.get("public_procurement_url") == "https://josephine.proebiz.com/sk/tender/65482/summary"
+        assert details.get("public_procurement_id") == "65482"
+        assert "identification_fields" not in details
+        assert "identification_section_items" not in details
 
     def test_extract_pdf_urls(self):
         """Test extracting PDF URLs from detail page."""
@@ -247,6 +265,54 @@ class TestExtractContractDetails:
 
 class TestScrapeContractsSmoke:
     """Smoke test for the full scraping function."""
+
+    @patch("scraper.download_and_extract_pdf")
+    @patch("scraper.fetch_page")
+    def test_autodetects_canonical_listing_url_from_landing_page(
+        self,
+        mock_fetch,
+        mock_pdf_download,
+    ):
+        """When /zmluvy/ has no table, scraper should switch to canonical form action URL."""
+        mock_fetch.side_effect = [
+            SAMPLE_LANDING_WITH_FILTER_ONLY_HTML,
+            SAMPLE_LISTING_HTML,
+            SAMPLE_DETAIL_HTML,
+            SAMPLE_DETAIL_HTML,
+        ]
+        mock_pdf_download.return_value = {
+            "pdf_url": "https://www.crz.gov.sk/data/att/6568046.pdf",
+            "pdf_local_path": None,
+            "pdf_text": None,
+        }
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            output_file = f.name
+
+        try:
+            count = scrape_contracts(
+                start_page=1,
+                max_pages=1,
+                output_file=output_file,
+                delay=0,
+                listing_url="https://www.crz.gov.sk/zmluvy/",
+            )
+
+            assert count == 2
+            assert mock_fetch.call_count == 4
+            second_call_url = mock_fetch.call_args_list[1].args[0]
+            assert second_call_url.startswith(
+                "https://www.crz.gov.sk/2171273-sk/centralny-register-zmluv/"
+            )
+
+            with open(output_file, "r", encoding="utf-8") as f:
+                contracts = json.load(f)
+
+            assert len(contracts) == 2
+            assert contracts[0]["contract_id"] == "12048046"
+            assert contracts[1]["contract_id"] == "12048044"
+        finally:
+            Path(output_file).unlink(missing_ok=True)
 
     @patch("scraper.download_and_extract_pdf")
     @patch("scraper.fetch_page")
@@ -291,6 +357,52 @@ class TestScrapeContractsSmoke:
             assert contract2["contract_id"] == "12048044"
             assert contract2["price_numeric_eur"] == 0.0
 
+        finally:
+            Path(output_file).unlink(missing_ok=True)
+
+    @patch("scraper.download_and_extract_pdf")
+    @patch("scraper.fetch_page")
+    def test_append_mode_skips_existing_contract_ids(self, mock_fetch, mock_pdf_download):
+        """Existing output JSON should be preserved and duplicate IDs should be skipped."""
+        # listing page + detail page only for the second (non-existing) contract
+        mock_fetch.side_effect = [
+            SAMPLE_LISTING_HTML,
+            SAMPLE_DETAIL_HTML,
+        ]
+        mock_pdf_download.return_value = {
+            "pdf_url": "https://www.crz.gov.sk/data/att/6568046.pdf",
+            "pdf_local_path": None,
+            "pdf_text": None,
+        }
+
+        existing_contract = {
+            "contract_id": "12048046",
+            "contract_url": "https://www.crz.gov.sk/zmluva/12048046/",
+            "contract_title": "existing",
+        }
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            output_file = f.name
+            json.dump([existing_contract], f, ensure_ascii=False, indent=2)
+            f.write("\n")
+
+        try:
+            count = scrape_contracts(
+                start_page=1,
+                max_pages=1,
+                output_file=output_file,
+                delay=0,
+            )
+
+            assert count == 1
+            assert mock_fetch.call_count == 2
+
+            with open(output_file, "r", encoding="utf-8") as f:
+                contracts = json.load(f)
+
+            assert len(contracts) == 2
+            assert contracts[0]["contract_id"] == "12048046"
+            assert contracts[1]["contract_id"] == "12048044"
         finally:
             Path(output_file).unlink(missing_ok=True)
 

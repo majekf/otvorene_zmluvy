@@ -12,7 +12,7 @@
     "buyer": "Obec Babín",
     "contract_url": "https://www.crz.gov.sk/zmluva/12074967/",
     "contract_id": "12074967",
-    "scraped_at": "2026-03-07T21:42:55.274074Z",
+    "scraped_at": "2026-03-08T00:31:42.930588Z",
     "category": "not_decided",
     "pdf_text_summary": "not_summarized",
     "award_type": "unknown",
@@ -24,62 +24,6 @@
     "supplier_detail": "TetraStav, s.r.o.",
     "ico_supplier": "36416851",
     "contract_id_detail": "12074967",
-    "identification_section_items": [
-      {
-        "label": "Typ",
-        "value": "Zmluva"
-      },
-      {
-        "label": "Č. zmluvy",
-        "value": "15/2026"
-      },
-      {
-        "label": "Rezort",
-        "value": "Subjekty verejnej správy"
-      },
-      {
-        "label": "Objednávateľ",
-        "value": "Obec Babín"
-      },
-      {
-        "label": "IČO",
-        "value": "00314382"
-      },
-      {
-        "label": "Dodávateľ",
-        "value": "TetraStav, s.r.o."
-      },
-      {
-        "label": "IČO",
-        "value": "36416851"
-      },
-      {
-        "label": "Názov zmluvy",
-        "value": "Zmluva o dielo"
-      },
-      {
-        "label": "ID zmluvy",
-        "value": "12074967"
-      },
-      {
-        "label": "Zverejnil",
-        "value": "Obec Babín"
-      }
-    ],
-    "identification_fields": {
-      "Typ": "Zmluva",
-      "Č. zmluvy": "15/2026",
-      "Rezort": "Subjekty verejnej správy",
-      "Objednávateľ": "Obec Babín",
-      "IČO": [
-        "00314382",
-        "36416851"
-      ],
-      "Dodávateľ": "TetraStav, s.r.o.",
-      "Názov zmluvy": "Zmluva o dielo",
-      "ID zmluvy": "12074967",
-      "Zverejnil": "Obec Babín"
-    },
     "date_published": "2026-03-06",
     "date_concluded": "2026-03-06",
     "date_effective": "2026-03-07",
@@ -118,7 +62,7 @@
     "scanned_contract_value": 2617398.84,
     "scanned_payment_reason": "za vykonanie diela",
     "scanned_contract_type": "konecna",
-    "scanned_summary": "Zhotoviteľ sa zaväzuje riadne a včas vykonať dielo \"Kanalizácia a ČOV : stavebný súbor 11.Babín, kanalizácia\" podľa projektovej dokumentácie a technickej správy.",
+    "scanned_summary": "Zhotoviteľ sa zaväzuje riadne a včas vykonať dielo 'Kanalizácia a ČOV : stavebný súbor 11.Babín, kanalizácia' podľa projektovej dokumentácie a technickej správy. Celková cena za predmet zmluvy s DPH je 2 617 398,84 €.",
     "scanned_subcontractors": [
       {
         "name": "ATYP INTERIÉR SERVIS, s.r.o. r.s.p.",
@@ -141,7 +85,7 @@
     "buyer": "Obec Hajnáčka",
     "contract_url": "https://www.crz.gov.sk/zmluva/12060363/",
     "contract_id": "12060363",
-    "scraped_at": "2026-03-07T21:45:18.946660Z",
+    "scraped_at": "2026-03-08T00:33:51.794031Z",
     "category": "not_decided",
     "pdf_text_summary": "not_summarized",
     "award_type": "unknown",
@@ -153,62 +97,6 @@
     "supplier_detail": "COMBIN BANSKÁ ŠTIAVNICA, s. r. o. Kysihýbelská 29, 969 01 Banská Štiavnica",
     "ico_supplier": "31631134",
     "contract_id_detail": "12060363",
-    "identification_section_items": [
-      {
-        "label": "Typ",
-        "value": "Zmluva"
-      },
-      {
-        "label": "Č. zmluvy",
-        "value": "27012026"
-      },
-      {
-        "label": "Rezort",
-        "value": "Subjekty verejnej správy"
-      },
-      {
-        "label": "Objednávateľ",
-        "value": "Obec Hajnáčka Hajnáčka 484, 98033 Hajnáčka"
-      },
-      {
-        "label": "IČO",
-        "value": "00318736"
-      },
-      {
-        "label": "Dodávateľ",
-        "value": "COMBIN BANSKÁ ŠTIAVNICA, s. r. o. Kysihýbelská 29, 969 01 Banská Štiavnica"
-      },
-      {
-        "label": "IČO",
-        "value": "31631134"
-      },
-      {
-        "label": "Názov zmluvy",
-        "value": "Zmluva o dielo"
-      },
-      {
-        "label": "ID zmluvy",
-        "value": "12060363"
-      },
-      {
-        "label": "Zverejnil",
-        "value": "Obec Hajnáčka"
-      }
-    ],
-    "identification_fields": {
-      "Typ": "Zmluva",
-      "Č. zmluvy": "27012026",
-      "Rezort": "Subjekty verejnej správy",
-      "Objednávateľ": "Obec Hajnáčka Hajnáčka 484, 98033 Hajnáčka",
-      "IČO": [
-        "00318736",
-        "31631134"
-      ],
-      "Dodávateľ": "COMBIN BANSKÁ ŠTIAVNICA, s. r. o. Kysihýbelská 29, 969 01 Banská Štiavnica",
-      "Názov zmluvy": "Zmluva o dielo",
-      "ID zmluvy": "12060363",
-      "Zverejnil": "Obec Hajnáčka"
-    },
     "date_published": "2026-03-04",
     "date_concluded": "2026-01-27",
     "date_effective": "2026-03-05",
@@ -255,7 +143,7 @@
     "buyer": "Trnavský samosprávny kraj",
     "contract_url": "https://www.crz.gov.sk/zmluva/12007982/",
     "contract_id": "12007982",
-    "scraped_at": "2026-03-07T21:59:32.881849Z",
+    "scraped_at": "2026-03-08T00:48:10.563639Z",
     "category": "not_decided",
     "pdf_text_summary": "not_summarized",
     "award_type": "unknown",
@@ -267,67 +155,6 @@
     "supplier_detail": "Ministerstvo investícií, regionálneho rozvoja a informatizácie Slovenskej republiky Pribinova 4195/25, 811 05 Bratislava",
     "ico_supplier": "50349287",
     "contract_id_detail": "12007982",
-    "identification_section_items": [
-      {
-        "label": "Typ",
-        "value": "Zmluva"
-      },
-      {
-        "label": "Č. zmluvy",
-        "value": "PROJEKTOVÁ ZMLUVA na realizáciu projektu v rámci podporného opatrenia „Švajčiarsko-slovenský program Zdravie“ spolufinancovaného z druhého Programu švajčiarsko-slovenskej spolupráce"
-      },
-      {
-        "label": "Rezort",
-        "value": "Subjekty verejnej správy"
-      },
-      {
-        "label": "Objednávateľ",
-        "value": "Trnavský samosprávny kraj Starohájska ulica 6868/10, 91701 Trnava"
-      },
-      {
-        "label": "IČO",
-        "value": "37836901"
-      },
-      {
-        "label": "Dodávateľ",
-        "value": "Ministerstvo investícií, regionálneho rozvoja a informatizácie Slovenskej republiky Pribinova 4195/25, 811 05 Bratislava"
-      },
-      {
-        "label": "IČO",
-        "value": "50349287"
-      },
-      {
-        "label": "Názov zmluvy",
-        "value": "PROJEKTOVÁ ZMLUVA na realizáciu projektu v rámci podporného opatrenia „Švajčiarsko-slovenský program Zdravie“ spolufinancovaného z druhého Programu švajčiarsko-slovenskej spolupráce"
-      },
-      {
-        "label": "ID zmluvy",
-        "value": "12007982"
-      },
-      {
-        "label": "Poznámka",
-        "value": "druhá zmluvná strana zverejnila zmluvu dňa 17.2.2026, účinnosť nadobudla dňa 18.2.2026"
-      },
-      {
-        "label": "Zverejnil",
-        "value": "Trnavský samosprávny kraj"
-      }
-    ],
-    "identification_fields": {
-      "Typ": "Zmluva",
-      "Č. zmluvy": "PROJEKTOVÁ ZMLUVA na realizáciu projektu v rámci podporného opatrenia „Švajčiarsko-slovenský program Zdravie“ spolufinancovaného z druhého Programu švajčiarsko-slovenskej spolupráce",
-      "Rezort": "Subjekty verejnej správy",
-      "Objednávateľ": "Trnavský samosprávny kraj Starohájska ulica 6868/10, 91701 Trnava",
-      "IČO": [
-        "37836901",
-        "50349287"
-      ],
-      "Dodávateľ": "Ministerstvo investícií, regionálneho rozvoja a informatizácie Slovenskej republiky Pribinova 4195/25, 811 05 Bratislava",
-      "Názov zmluvy": "PROJEKTOVÁ ZMLUVA na realizáciu projektu v rámci podporného opatrenia „Švajčiarsko-slovenský program Zdravie“ spolufinancovaného z druhého Programu švajčiarsko-slovenskej spolupráce",
-      "ID zmluvy": "12007982",
-      "Poznámka": "druhá zmluvná strana zverejnila zmluvu dňa 17.2.2026, účinnosť nadobudla dňa 18.2.2026",
-      "Zverejnil": "Trnavský samosprávny kraj"
-    },
     "date_published": "2026-02-18",
     "date_concluded": "2026-02-13",
     "date_effective": "2026-02-19",
@@ -345,7 +172,7 @@
     "scanned_contract_value": 1039842.0,
     "scanned_payment_reason": "Poskytnutie Projektového grantu na realizáciu Projektu",
     "scanned_contract_type": "konecna",
-    "scanned_summary": "Zmluva o poskytnutí Projektového grantu na realizáciu projektu v rámci podporného opatrenia 'Švajčiarsko-slovenský program Zdravie'.",
+    "scanned_summary": "Zmluva na realizáciu projektu v rámci podporného opatrenia 'Švajčiarsko-slovenský program Zdravie', zameraná na zníženie odvrátiteľnej úmrtnosti a zníženie miery výskytu neprenosných chorôb.",
     "scanned_subcontractors": [
       {
         "name": "Sekunda pre život, občianske združenie",
