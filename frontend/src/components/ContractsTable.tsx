@@ -18,6 +18,7 @@ interface ContractsTableProps {
   onSortChange: (sort: SortSpec) => void;
   onRowClick?: (contractId: string) => void;
   contractSeverities?: Record<string, number>;
+  variant?: 'default' | 'all-contracts';
 }
 
 interface ColumnDef {
@@ -28,7 +29,7 @@ interface ColumnDef {
   className?: string;
 }
 
-const COLUMNS: ColumnDef[] = [
+const DEFAULT_COLUMNS: ColumnDef[] = [
   {
     key: 'contract_title',
     label: 'Title',
@@ -122,6 +123,29 @@ const COLUMNS: ColumnDef[] = [
   },
 ];
 
+const ALL_CONTRACTS_COLUMNS: ColumnDef[] = [
+  ...DEFAULT_COLUMNS.slice(0, 6),
+  {
+    key: 'scanned_suggested_title',
+    label: 'Subject',
+    sortable: false,
+    className: 'max-w-[260px] truncate',
+    render: (c) => c.scanned_suggested_title || 'â€”',
+  },
+  {
+    key: 'scanned_service_type',
+    label: 'Type',
+    sortable: false,
+    render: (c) => c.scanned_service_type || 'â€”',
+  },
+  {
+    key: 'scanned_service_subtype',
+    label: 'Subtype',
+    sortable: false,
+    render: (c) => c.scanned_service_subtype || 'â€”',
+  },
+];
+
 function findSortIndex(sort: SortSpec, field: string): number {
   return sort.findIndex(([f]) => f === field);
 }
@@ -132,7 +156,9 @@ function directionArrow(dir: string): string {
 
 const PRIORITY_BADGES = ['①', '②', '③'];
 
-export default function ContractsTable({ contracts, sort, onSortChange, onRowClick, contractSeverities }: ContractsTableProps) {
+export default function ContractsTable({ contracts, sort, onSortChange, onRowClick, contractSeverities, variant = 'default' }: ContractsTableProps) {
+  const columns = variant === 'all-contracts' ? ALL_CONTRACTS_COLUMNS : DEFAULT_COLUMNS;
+
   const handleHeaderClick = useCallback(
     (field: string, e: React.MouseEvent | React.KeyboardEvent) => {
       const shiftKey = e.shiftKey;
@@ -199,7 +225,7 @@ export default function ContractsTable({ contracts, sort, onSortChange, onRowCli
       <table className="data-table" aria-label="Contracts">
         <thead>
           <tr>
-            {COLUMNS.map((col) => {
+            {columns.map((col) => {
               const sortIdx = findSortIndex(sort, col.key);
               const isSorted = sortIdx >= 0;
               return (
@@ -240,7 +266,7 @@ export default function ContractsTable({ contracts, sort, onSortChange, onRowCli
               onClick={() => c.contract_id && onRowClick?.(c.contract_id)}
               onKeyDown={(e) => c.contract_id ? handleRowKeyDown(c.contract_id, e) : undefined}
             >
-              {COLUMNS.map((col) => (
+              {columns.map((col) => (
                 <td key={col.key} className={col.className || ''}>
                   {col.render(c)}
                 </td>

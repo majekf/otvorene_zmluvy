@@ -1,0 +1,20 @@
+Please update the “All Contracts” tab in the contracts list view with the following changes:
+	Remove the “Award” column
+	Delete the Award column from the contracts table/list.
+	Add a new “Subject” column
+	Add a new column named Subject.
+	Its value should be populated from scanned_suggested_title.
+	Add “Type” and “Subtype” columns
+	Add a Type column that displays the value of scanned_service_type.
+	Add a Subtype column that displays the value of scanned_service_subtype.
+
+Requirements:
+	Apply these changes specifically to the “All Contracts” tab/list.
+	Update the table configuration, column definitions, and any related mapping/rendering logic as needed.
+	Preserve the rest of the existing behavior unchanged.
+
+Expected result:
+	Award is removed.
+	Subject is added and shows scanned_suggested_title.
+	Type is added and shows scanned_service_type.
+	Subtype is added and shows scanned_service_subtype.

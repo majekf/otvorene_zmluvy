@@ -10,7 +10,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CompareAggregationsResponse, GroupByField } from '../types';
 import { fetchCompareAggregations } from '../api';
-import { formatEur, formatCompact } from '../utils';
+import { formatCompact } from '../utils';
 import FilterBar from '../components/FilterBar';
 import GroupByControl from '../components/GroupByControl';
 import ClusteredBarChart from '../components/ClusteredBarChart';
