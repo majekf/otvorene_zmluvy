@@ -134,16 +134,38 @@ def expand_contracts_by_subcontractors(
             expanded.append(row)
 
     out_file = Path(output_path)
+    existing_rows: List[Dict[str, Any]] = []
+    if out_file.exists():
+        existing_text = out_file.read_text(encoding="utf-8").strip()
+        if existing_text:
+            existing_payload = json.loads(existing_text)
+            if not isinstance(existing_payload, list):
+                raise ValueError("Existing output JSON must contain a top-level list")
+            existing_rows = [row for row in existing_payload if isinstance(row, dict)]
+
+    def _row_key(row: Dict[str, Any]) -> tuple:
+        return (
+            str(row.get("contract_id") or ""),
+            str(row.get("subcontractor") or ""),
+            str(row.get("ico_subcontractor") or ""),
+        )
+
+    existing_keys = {_row_key(row) for row in existing_rows}
+    new_rows = [row for row in expanded if _row_key(row) not in existing_keys]
+    combined_rows = existing_rows + new_rows
+
     out_file.parent.mkdir(parents=True, exist_ok=True)
     out_file.write_text(
-        json.dumps(expanded, ensure_ascii=False, indent=2),
+        json.dumps(combined_rows, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
     return {
         "contracts_total": len(contracts),
         "contracts_with_subcontractors": contracts_with_subcontractors,
-        "rows_written": len(expanded),
+        "rows_written": len(combined_rows),
+        "rows_added": len(new_rows),
+        "rows_existing": len(existing_rows),
     }
 
 
@@ -188,6 +210,7 @@ def main() -> int:
         f"contracts_total={stats['contracts_total']}, "
         f"contracts_with_subcontractors={stats['contracts_with_subcontractors']}, "
         f"rows_written={stats['rows_written']}, "
+        f"rows_added={stats['rows_added']}, "
         f"output={args.output}"
     )
     return 0

@@ -124,6 +124,32 @@ def extract_label_value(li: Any) -> Optional[Dict[str, Optional[str]]]:
     return {"label": label, "value": value or None}
 
 
+def extract_public_procurement_id(public_procurement_url: Optional[str]) -> Optional[str]:
+    """Extract procurement identifier from known external procurement URLs."""
+    if not public_procurement_url:
+        return None
+
+    parsed = urlparse(public_procurement_url)
+    path = parsed.path or ""
+
+    # Josephine format: /sk/tender/<id>/summary
+    tender_match = re.search(r"/tender/(\d+)(?:/|$)", path)
+    if tender_match:
+        return tender_match.group(1)
+
+    # UVO format often includes /detail/<id>
+    detail_match = re.search(r"/detail/(\d+)(?:/|$)", path)
+    if detail_match:
+        return detail_match.group(1)
+
+    # Fallback: use the last numeric segment in path.
+    numeric_parts = re.findall(r"\d+", path)
+    if numeric_parts:
+        return numeric_parts[-1]
+
+    return None
+
+
 def matches_price_filter(
     price: Optional[float],
     min_price: Optional[float],
@@ -328,6 +354,25 @@ def extract_listing_rows(html: str) -> List[Dict[str, Any]]:
     return rows
 
 
+def detect_canonical_listing_url(html: str, current_listing_url: str) -> Optional[str]:
+    """Detect canonical CRZ listing URL from filter form action on landing pages."""
+    soup = BeautifulSoup(html, "html.parser")
+
+    filter_form = soup.find("form", id=re.compile(r"^frm_filter_"))
+    if not filter_form:
+        return None
+
+    action = filter_form.get("action")
+    if not action:
+        return None
+
+    candidate = urljoin(BASE_URL, action)
+    if candidate.rstrip("/") == current_listing_url.rstrip("/"):
+        return None
+
+    return candidate
+
+
 def extract_contract_details(html: str, contract_url: str) -> Dict[str, Any]:
     """Extract detailed contract information from detail page."""
     del contract_url  # kept for backwards-compatible signature
@@ -351,8 +396,6 @@ def extract_contract_details(html: str, contract_url: str) -> Dict[str, Any]:
         if "identifik" in header_norm:
             list_items = body.find_all("li")
             last_entity = None  # buyer/supplier/rezort context for repeated ICO labels
-            identification_items: List[Dict[str, Optional[str]]] = []
-            identification_fields: Dict[str, Any] = {}
 
             for li in list_items:
                 label_value = extract_label_value(li)
@@ -362,17 +405,6 @@ def extract_contract_details(html: str, contract_url: str) -> Dict[str, Any]:
                 label = label_value["label"]
                 value = label_value["value"]
                 label_norm = normalize_text(label)
-
-                identification_items.append({"label": label, "value": value})
-
-                if label in identification_fields:
-                    existing = identification_fields[label]
-                    if isinstance(existing, list):
-                        existing.append(value)
-                    else:
-                        identification_fields[label] = [existing, value]
-                else:
-                    identification_fields[label] = value
 
                 if "c. zmluvy" in label_norm or "cislo zmluvy" in label_norm:
                     details["contract_number_detail"] = value
@@ -405,17 +437,15 @@ def extract_contract_details(html: str, contract_url: str) -> Dict[str, Any]:
                             BASE_URL,
                             link["href"],
                         )
+                        details["public_procurement_id"] = extract_public_procurement_id(
+                            details["public_procurement_url"]
+                        )
                         details["public_procurement_portal"] = link.get_text(
                             " ",
                             strip=True,
                         )
                     elif value:
                         details["public_procurement_portal"] = value
-
-            if identification_items:
-                details["identification_section_items"] = identification_items
-            if identification_fields:
-                details["identification_fields"] = identification_fields
 
         elif "datum" in header_norm:
             list_items = body.find_all("li")
@@ -461,6 +491,9 @@ def extract_contract_details(html: str, contract_url: str) -> Dict[str, Any]:
                 link = li.find("a", href=True)
                 if link:
                     details["public_procurement_url"] = urljoin(BASE_URL, link["href"])
+                    details["public_procurement_id"] = extract_public_procurement_id(
+                        details["public_procurement_url"]
+                    )
                     details["public_procurement_portal"] = link.get_text(" ", strip=True)
                     break
     return details
@@ -777,13 +810,38 @@ def scrape_contracts(
     pdfs_downloaded = 0
     scraped_contracts: List[Dict[str, Any]] = []
     pending_text_jobs: List[Dict[str, Any]] = []
+    existing_contracts: List[Dict[str, Any]] = []
+    known_contract_ids: set[str] = set()
+    active_listing_url = listing_url
+
+    output_path = Path(output_file)
+    if output_path.exists():
+        existing_text = output_path.read_text(encoding="utf-8").strip()
+        if existing_text:
+            loaded = json.loads(existing_text)
+            if not isinstance(loaded, list):
+                raise ValueError(
+                    f"Existing output file {output_file} must contain a JSON array"
+                )
+            existing_contracts = loaded
+            known_contract_ids = {
+                str(item.get("contract_id"))
+                for item in existing_contracts
+                if isinstance(item, dict) and item.get("contract_id")
+            }
+            logger.info(
+                "Loaded %d existing contracts (%d with contract_id) from %s",
+                len(existing_contracts),
+                len(known_contract_ids),
+                output_file,
+            )
 
     try:
         with ThreadPoolExecutor(max_workers=max(1, ocr_workers)) as ocr_executor:
             for page_num in range(start_page, start_page + max_pages):
                 url_page = page_num - 1
                 page_url = build_listing_page_url(
-                    listing_url=listing_url,
+                    listing_url=active_listing_url,
                     page_index=url_page,
                     crz_filters=crz_filters,
                 )
@@ -796,6 +854,35 @@ def scrape_contracts(
                     continue
 
                 rows = extract_listing_rows(html)
+
+                if not rows:
+                    canonical_listing_url = detect_canonical_listing_url(
+                        html,
+                        active_listing_url,
+                    )
+                    if canonical_listing_url:
+                        logger.info(
+                            "Detected canonical CRZ listing URL from filter action: %s",
+                            canonical_listing_url,
+                        )
+                        active_listing_url = canonical_listing_url
+                        retry_page_url = build_listing_page_url(
+                            listing_url=active_listing_url,
+                            page_index=url_page,
+                            crz_filters=crz_filters,
+                        )
+                        logger.info(
+                            "Retrying page %d using canonical listing URL",
+                            page_num,
+                        )
+                        retry_html = fetch_page(
+                            retry_page_url,
+                            session,
+                            throttler=throttler,
+                        )
+                        if retry_html:
+                            rows = extract_listing_rows(retry_html)
+
                 logger.info(f"Found {len(rows)} contracts on page {page_num}")
 
                 if min_price is not None or max_price is not None:
@@ -821,6 +908,14 @@ def scrape_contracts(
                             "Reached max_contracts=%d, stopping scrape", max_contracts
                         )
                         break
+
+                    row_contract_id = row.get("contract_id")
+                    if row_contract_id and row_contract_id in known_contract_ids:
+                        logger.info(
+                            "Skipping already present contract_id=%s",
+                            row_contract_id,
+                        )
+                        continue
 
                     try:
                         contract_data = dict(row)
@@ -899,6 +994,8 @@ def scrape_contracts(
 
                         scraped_contracts.append(contract_data)
                         contracts_processed += 1
+                        if row_contract_id:
+                            known_contract_ids.add(row_contract_id)
 
                     except Exception as e:
                         logger.error(
@@ -932,8 +1029,9 @@ def scrape_contracts(
                         text_error,
                     )
 
+        combined_contracts = existing_contracts + scraped_contracts
         with open(output_file, "w", encoding="utf-8") as out_f:
-            out_f.write(json.dumps(scraped_contracts, ensure_ascii=False, indent=2))
+            out_f.write(json.dumps(combined_contracts, ensure_ascii=False, indent=2))
             out_f.write("\n")
 
     except Exception as e:
