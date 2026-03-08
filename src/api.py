@@ -650,6 +650,8 @@ def get_rankings(
     metric: str = Query(
         "total_spend", description="Ranking metric"
     ),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=500),
 ):
     """Ranked list of institutions or vendors.
 
@@ -657,18 +659,28 @@ def get_rankings(
     max_value, direct_award_rate, vendor_concentration,
     fragmentation_score (institutions only).
     Accepts filters to restrict the contract set before ranking.
+    Supports pagination via page / page_size query parameters.
     """
     filtered = store.filter(filters)
 
     if entity == "vendors":
-        rankings = _rank_vendors_from(store, filtered, metric)
+        all_rankings = _rank_vendors_from(store, filtered, metric)
     else:
-        rankings = _rank_institutions_from(store, filtered, metric)
+        all_rankings = _rank_institutions_from(store, filtered, metric)
+
+    total = len(all_rankings)
+    total_pages = math.ceil(total / page_size) if total > 0 else 0
+    start = (page - 1) * page_size
+    end = start + page_size
 
     return {
         "entity": entity,
         "metric": metric,
-        "rankings": rankings,
+        "rankings": all_rankings[start:end],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
     }
 
 

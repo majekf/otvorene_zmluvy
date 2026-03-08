@@ -15,6 +15,7 @@ import { useFilterContext } from '../FilterContext';
 import { formatEur } from '../utils';
 import WorkspaceToolbar from '../components/WorkspaceToolbar';
 import { TableSkeleton } from '../components/LoadingSkeleton';
+import Pagination from '../components/Pagination';
 
 type EntityType = 'institutions' | 'vendors';
 
@@ -56,6 +57,9 @@ export default function GlobalView() {
   const { filters, setFilters, institutions, categories, vendors, awardTypes } = useFilterContext();
   const [rankings, setRankings] = useState<RankingItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const PAGE_SIZE = 20;
 
   const metrics = entity === 'institutions' ? INSTITUTION_METRICS : VENDOR_METRICS;
 
@@ -64,21 +68,25 @@ export default function GlobalView() {
     const params = new URLSearchParams();
     if (entity !== 'institutions') params.set('entity', entity);
     if (metric !== 'total_spend') params.set('metric', metric);
+    if (page > 1) params.set('page', String(page));
     if (filters.institutions?.length) params.set('institutions', filters.institutions.join('|'));
     if (filters.date_from) params.set('date_from', filters.date_from);
     if (filters.date_to) params.set('date_to', filters.date_to);
     if (filters.categories?.length) params.set('categories', filters.categories.join('|'));
     setSearchParams(params, { replace: true });
-  }, [entity, metric, filters, setSearchParams]);
+  }, [entity, metric, filters, page, setSearchParams]);
 
   // Fetch rankings
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
 
-    fetchRankings(entity, metric, filters)
-      .then(({ rankings: r }) => {
-        if (!cancelled) setRankings(r);
+    fetchRankings(entity, metric, filters, page, PAGE_SIZE)
+      .then(({ rankings: r, total: t }) => {
+        if (!cancelled) {
+          setRankings(r);
+          setTotal(t);
+        }
       })
       .catch(() => {})
       .finally(() => {
@@ -86,15 +94,19 @@ export default function GlobalView() {
       });
 
     return () => { cancelled = true; };
-  }, [entity, metric, filters]);
+  }, [entity, metric, filters, page]);
 
-  const handleFilterChange = useCallback((f: Parameters<typeof setFilters>[0]) => setFilters(f), [setFilters]);
+  const handleFilterChange = useCallback((f: Parameters<typeof setFilters>[0]) => {
+    setFilters(f);
+    setPage(1);
+  }, [setFilters]);
 
   // Reset metric when entity changes if the current metric isn't valid
   useEffect(() => {
     const validIds = metrics.map((m) => m.id);
     if (!validIds.includes(metric)) {
       setMetric('total_spend');
+      setPage(1);
     }
   }, [entity, metric, metrics]);
 
@@ -140,14 +152,14 @@ export default function GlobalView() {
             <button
               data-testid="entity-institutions"
               className={entity === 'institutions' ? 'active' : ''}
-              onClick={() => setEntity('institutions')}
+              onClick={() => { setEntity('institutions'); setPage(1); }}
             >
               Institutions
             </button>
             <button
               data-testid="entity-vendors"
               className={entity === 'vendors' ? 'active' : ''}
-              onClick={() => setEntity('vendors')}
+              onClick={() => { setEntity('vendors'); setPage(1); }}
             >
               Vendors
             </button>
@@ -166,7 +178,7 @@ export default function GlobalView() {
                   ? 'bg-primary-50 border-primary-400 text-primary-700 shadow-sm'
                   : 'bg-white border-slate-200 text-slate-600 hover:border-primary-300'
               }`}
-              onClick={() => setMetric(m.id)}
+              onClick={() => { setMetric(m.id); setPage(1); }}
             >
               {m.label}
             </button>
@@ -180,50 +192,59 @@ export default function GlobalView() {
       ) : rankings.length === 0 ? (
         <p className="text-slate-400 text-sm" data-testid="global-empty">No rankings available.</p>
       ) : (
-        <div data-testid="rankings-table" className="glass-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th className="w-16">#</th>
-                  <th>
-                    {entity === 'institutions' ? 'Institution' : 'Vendor'}
-                  </th>
-                  <th className="text-right">
-                    {metrics.find((m) => m.id === metric)?.label || metric}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rankings.map((item) => (
-                  <tr
-                    key={item.rank}
-                    data-testid={`rank-row-${item.rank}`}
-                  >
-                    <td className="font-mono text-slate-400">{item.rank}</td>
-                    <td>
-                      <Link
-                        to={entityLink(item)}
-                        className="text-primary-600 hover:text-primary-800 font-medium transition-colors"
-                      >
-                        {entityLabel(item)}
-                      </Link>
-                    </td>
-                    <td className="text-right font-mono tabular-nums">
-                      {formatMetricValue(metric, item.value)}
-                    </td>
+        <>
+          <div data-testid="rankings-table" className="glass-card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-16">#</th>
+                    <th>
+                      {entity === 'institutions' ? 'Institution' : 'Vendor'}
+                    </th>
+                    <th className="text-right">
+                      {metrics.find((m) => m.id === metric)?.label || metric}
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {rankings.map((item) => (
+                    <tr
+                      key={item.rank}
+                      data-testid={`rank-row-${item.rank}`}
+                    >
+                      <td className="font-mono text-slate-400">{item.rank}</td>
+                      <td>
+                        <Link
+                          to={entityLink(item)}
+                          className="text-primary-600 hover:text-primary-800 font-medium transition-colors"
+                        >
+                          {entityLabel(item)}
+                        </Link>
+                      </td>
+                      <td className="text-right font-mono tabular-nums">
+                        {formatMetricValue(metric, item.value)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          <Pagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={total}
+            onPageChange={setPage}
+          />
+        </>
       )}
 
       {/* Summary */}
-      {rankings.length > 0 && (
+      {total > 0 && (
         <div className="text-xs text-slate-400" data-testid="global-summary">
-          Showing {rankings.length} {entity} ranked by {metrics.find((m) => m.id === metric)?.label || metric}
+          Showing {rankings.length} of {total} {entity} ranked by {metrics.find((m) => m.id === metric)?.label || metric}
         </div>
       )}
     </div>
