@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "test": "npm --prefix frontend run test"
+  },
+  "dependencies": {
+    "vitest": "^4.0.18"
+  }
+}

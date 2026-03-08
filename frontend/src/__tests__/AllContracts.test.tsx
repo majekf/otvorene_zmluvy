@@ -18,6 +18,9 @@ const mockContracts = {
     {
       contract_id: 'c1',
       contract_title: 'Road Construction A',
+      scanned_suggested_title: 'Road resurfacing and repair',
+      scanned_service_type: 'construction_services',
+      scanned_service_subtype: 'road_maintenance',
       contract_number: null,
       buyer: 'Ministry of Transport',
       supplier: 'BuildCo',
@@ -41,6 +44,9 @@ const mockContracts = {
     {
       contract_id: 'c2',
       contract_title: 'IT Services B',
+      scanned_suggested_title: 'Managed IT support',
+      scanned_service_type: 'it_services',
+      scanned_service_subtype: 'helpdesk',
       contract_number: null,
       buyer: 'Ministry of Finance',
       supplier: 'TechCorp',
@@ -94,10 +100,21 @@ describe('AllContracts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(api.fetchContracts).mockResolvedValue(mockContracts);
+    vi.mocked(api.fetchInstitutions).mockResolvedValue({ institutions: [] });
+    vi.mocked(api.fetchVendors).mockResolvedValue({ vendors: [] });
     vi.mocked(api.fetchAggregations).mockResolvedValue({
       group_by: '',
       results: [],
       summary: { contract_count: 0, total_spend: 0, avg_value: 0, max_value: 0 },
+    });
+    vi.mocked(api.fetchFilterOptions).mockResolvedValue({
+      institutions: [],
+      vendors: [],
+      institution_icos: [],
+      vendor_icos: [],
+      categories: [],
+      scanned_service_types: [],
+      scanned_service_subtypes: [],
     });
   });
 
@@ -140,6 +157,29 @@ describe('AllContracts', () => {
     await waitFor(() => {
       expect(screen.getByText('Road Construction A')).toBeInTheDocument();
       expect(screen.getByText('IT Services B')).toBeInTheDocument();
+    });
+  });
+
+  it('uses All Contracts table columns: Subject, Type, Subtype, without Award', async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('th-scanned_suggested_title')).toHaveTextContent('Subject');
+      expect(screen.getByTestId('th-scanned_service_type')).toHaveTextContent('Type');
+      expect(screen.getByTestId('th-scanned_service_subtype')).toHaveTextContent('Subtype');
+      expect(screen.queryByTestId('th-category')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('th-award_type')).not.toBeInTheDocument();
+    });
+  });
+
+  it('renders Subject, Type, and Subtype values from scanned fields', async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Road resurfacing and repair')).toBeInTheDocument();
+      expect(screen.getByText('construction_services')).toBeInTheDocument();
+      expect(screen.getByText('road_maintenance')).toBeInTheDocument();
+      expect(screen.getByText('Managed IT support')).toBeInTheDocument();
+      expect(screen.getByText('it_services')).toBeInTheDocument();
+      expect(screen.getByText('helpdesk')).toBeInTheDocument();
     });
   });
 
@@ -234,6 +274,22 @@ describe('AllContracts', () => {
       const callArgs = vi.mocked(api.fetchContracts).mock.calls[0];
       // page argument (index 1) should be 1
       expect(callArgs[1]).toBe(1);
+    });
+  });
+
+  it('sends Subject sort to API in all-contracts table', async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('contracts-table')).toBeInTheDocument();
+    });
+
+    vi.mocked(api.fetchContracts).mockClear();
+    fireEvent.click(screen.getByTestId('th-scanned_suggested_title'));
+
+    await waitFor(() => {
+      expect(api.fetchContracts).toHaveBeenCalled();
+      const callArgs = vi.mocked(api.fetchContracts).mock.calls[0];
+      expect(callArgs[3]).toEqual([['scanned_suggested_title', 'asc']]);
     });
   });
 });

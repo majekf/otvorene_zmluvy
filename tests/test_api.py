@@ -663,6 +663,9 @@ class TestContractsSort:
         {
             "contract_id": "T001",
             "contract_title": "Alpha contract",
+            "scanned_suggested_title": "Zeta support",
+            "scanned_service_type": "water_services",
+            "scanned_service_subtype": "zoning",
             "buyer": "Org A",
             "supplier": "Vendor X",
             "price_numeric_eur": 1_000_000.0,
@@ -673,6 +676,9 @@ class TestContractsSort:
         {
             "contract_id": "T002",
             "contract_title": "Beta contract",
+            "scanned_suggested_title": "Alpha support",
+            "scanned_service_type": "airport_services",
+            "scanned_service_subtype": "airfield",
             "buyer": "Org A",
             "supplier": "Vendor Y",
             "price_numeric_eur": 500_000.0,
@@ -683,6 +689,9 @@ class TestContractsSort:
         {
             "contract_id": "T003",
             "contract_title": "Gamma contract",
+            "scanned_suggested_title": "Beta support",
+            "scanned_service_type": "building_services",
+            "scanned_service_subtype": "bridges",
             "buyer": "Org B",
             "supplier": "Vendor Z",
             "price_numeric_eur": 500_000.0,
@@ -744,6 +753,16 @@ class TestContractsSort:
         assert contracts[0]["contract_id"] == "T001"
         assert contracts[1]["contract_id"] == "T002"
         assert contracts[2]["contract_id"] == "T003"
+
+    def test_sort_by_scanned_subject_alphabetical(self, tie_client):
+        """Scanned subject column supports alphabetical sort."""
+        r = tie_client.get(
+            "/api/contracts",
+            params={"sort": "scanned_suggested_title:asc"},
+        )
+        assert r.status_code == 200
+        contracts = r.json()["contracts"]
+        assert [c["contract_id"] for c in contracts] == ["T002", "T003", "T001"]
 
     def test_sort_combined_with_filter(self, client):
         """Filter reduces the set; sort is applied to the filtered subset only."""

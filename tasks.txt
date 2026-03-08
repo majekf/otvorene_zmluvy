@@ -1,0 +1,28 @@
+Please update the contracts table with the following changes:
+	Remove the “Category” column completely
+	Fully remove the Category column from the table UI and any related column configuration/mapping.
+	Add sorting for “Subject”, “Type”, and “Subtype”
+
+Enable sorting for the following columns:
+	Subject
+	Type
+	Subtype
+When the user clicks a column header, the table should sort that column in alphabetical order.
+	Preserve the existing sorting behavior pattern used elsewhere in the table, if applicable.
+	Fix sorting for “Title”, “Vendor”, and “Institution”
+
+Repair the sorting logic for these existing columns:
+	Title
+	Vendor
+	Institution
+These columns should also sort correctly in alphabetical order when their headers are clicked.
+
+Requirements:
+	Apply the changes in the relevant table component(s), column definitions, and sorting logic.
+	Remove all obsolete references to the Category column if they are no longer needed.
+	Keep the rest of the table behavior unchanged.
+
+Expected result:
+	Category is fully removed.
+	Subject, Type, and Subtype are sortable alphabetically by clicking the column header.
+	Title, Vendor, and Institution sorting works correctly and alphabetically.

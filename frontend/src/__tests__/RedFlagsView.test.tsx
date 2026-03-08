@@ -10,22 +10,23 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import RedFlagsView from '../pages/RedFlagsView';
 import { FilterProvider } from '../FilterContext';
 import * as api from '../api';
+import type { RulePreset } from '../types';
 
 vi.mock('../api');
 
-const mockPresets = {
+const mockPresets: { presets: RulePreset[] } = {
   presets: [
     {
       id: 'threshold_proximity',
       name: 'Threshold Proximity',
       description: 'Flags contracts near a threshold.',
-      params: { threshold_eur: 100000, proximity_pct: 10 },
+      params: { threshold_eur: 100000, proximity_pct: 10 } as Record<string, number>,
     },
     {
       id: 'vendor_concentration',
       name: 'Vendor Concentration',
       description: 'Top vendors holding too much spend.',
-      params: { top_n: 1, max_share_pct: 60 },
+      params: { top_n: 1, max_share_pct: 60 } as Record<string, number>,
     },
   ],
 };
@@ -51,15 +52,13 @@ describe('RedFlagsView', () => {
       results: [],
       summary: { contract_count: 0, total_spend: 0, avg_value: 0, max_value: 0 },
     });
-    vi.mocked(api.fetchInstitutions).mockResolvedValue([]);
-    vi.mocked(api.fetchVendors).mockResolvedValue([]);
+    vi.mocked(api.fetchInstitutions).mockResolvedValue({ institutions: [] });
+    vi.mocked(api.fetchVendors).mockResolvedValue({ vendors: [] });
     vi.mocked(api.fetchFilterOptions).mockResolvedValue({
       institutions: [], categories: [], vendors: [],
       institution_icos: [], vendor_icos: [],
-      institution_ico_map: {}, vendor_ico_map: {},
-      institution_counts: {}, vendor_counts: {},
-      institution_ico_counts: {}, vendor_ico_counts: {},
-      category_counts: {}, award_types: [],
+      scanned_service_types: [],
+      scanned_service_subtypes: [],
     });
   });
 

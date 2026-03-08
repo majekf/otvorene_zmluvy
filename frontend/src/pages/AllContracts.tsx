@@ -158,6 +158,7 @@ export default function AllContracts() {
             onSortChange={handleSortChange}
             onRowClick={handleRowClick}
             contractSeverities={{}}
+            variant="all-contracts"
           />
           <Pagination
             page={contracts.page}

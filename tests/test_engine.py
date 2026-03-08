@@ -694,37 +694,57 @@ def sort_store() -> DataStore:
         {
             "contract_title": "Alpha contract",
             "buyer": "Inst A",
+            "supplier": "Vendor C",
             "price_numeric_eur": 500_000.0,
             "published_date": "2025-01-15",
             "category": "construction",
+            "scanned_suggested_title": "Road maintenance",
+            "scanned_service_type": "construction_services",
+            "scanned_service_subtype": "bridges",
         },
         {
             "contract_title": "Beta contract",
             "buyer": "Inst A",
+            "supplier": "vendor a",
             "price_numeric_eur": 500_000.0,  # same price as Alpha
             "published_date": "2025-06-01",   # later date
             "category": "IT",
+            "scanned_suggested_title": "Airport support",
+            "scanned_service_type": "air_transport",
+            "scanned_service_subtype": "airfield",
         },
         {
             "contract_title": "Gamma contract",
             "buyer": "Inst B",
+            "supplier": "Vendor D",
             "price_numeric_eur": 200_000.0,
             "published_date": "2025-03-20",
             "category": "services",
+            "scanned_suggested_title": "Waste collection",
+            "scanned_service_type": "waste_services",
+            "scanned_service_subtype": "bins",
         },
         {
             "contract_title": "delta contract",  # intentional lowercase
             "buyer": "Inst B",
+            "supplier": "Vendor B",
             "price_numeric_eur": 800_000.0,
             "published_date": "2025-09-10",
             "category": "supplies",
+            "scanned_suggested_title": "Zoo cleaning",
+            "scanned_service_type": "cleaning_services",
+            "scanned_service_subtype": "zebra",
         },
         {
             "contract_title": "Epsilon contract",
             "buyer": "Inst C",
+            "supplier": "Vendor E",
             "price_numeric_eur": None,          # None price
             "published_date": "2025-07-01",
             "category": "construction",
+            "scanned_suggested_title": None,
+            "scanned_service_type": None,
+            "scanned_service_subtype": None,
         },
     ])
     return ds
@@ -735,6 +755,12 @@ def sort_store() -> DataStore:
 
 class TestSort:
     """Tests for sort_contracts() and the SORTABLE_FIELDS constant."""
+
+    def test_sortable_fields_include_scanned_columns(self):
+        """Scanned table columns are whitelisted for API/UI sort specs."""
+        assert "scanned_suggested_title" in SORTABLE_FIELDS
+        assert "scanned_service_type" in SORTABLE_FIELDS
+        assert "scanned_service_subtype" in SORTABLE_FIELDS
 
     def test_sort_single_field_ascending(self, sort_store: DataStore):
         """price_numeric_eur sorted low → high; None last."""
@@ -789,6 +815,57 @@ class TestSort:
         assert titles_lower == sorted(titles_lower)
         # 'delta contract' (lowercase) sorts between 'beta' and 'epsilon'
         assert result[2].contract_title == "delta contract"
+
+    def test_sort_buyer_alphabetical(self, sort_store: DataStore):
+        """buyer sorted alphabetically, case-insensitive."""
+        result = sort_store.sort_contracts(sort_store.contracts, [("buyer", "asc")])
+        buyers = [c.buyer for c in result]
+        assert buyers[:2] == ["Inst A", "Inst A"]
+        assert buyers[2:4] == ["Inst B", "Inst B"]
+        assert buyers[4] == "Inst C"
+
+    def test_sort_supplier_alphabetical(self, sort_store: DataStore):
+        """supplier sorted alphabetically, case-insensitive."""
+        result = sort_store.sort_contracts(sort_store.contracts, [("supplier", "asc")])
+        suppliers = [c.supplier for c in result]
+        assert suppliers == ["vendor a", "Vendor B", "Vendor C", "Vendor D", "Vendor E"]
+
+    def test_sort_scanned_subject_alphabetical(self, sort_store: DataStore):
+        """scanned_suggested_title sorts alphabetically with None values last."""
+        result = sort_store.sort_contracts(
+            sort_store.contracts, [("scanned_suggested_title", "asc")]
+        )
+        subjects = [sort_store._sort_field_value(c, "scanned_suggested_title") for c in result]
+        assert subjects[:4] == [
+            "Airport support",
+            "Road maintenance",
+            "Waste collection",
+            "Zoo cleaning",
+        ]
+        assert subjects[4] is None
+
+    def test_sort_scanned_type_alphabetical(self, sort_store: DataStore):
+        """scanned_service_type sorts alphabetically with None values last."""
+        result = sort_store.sort_contracts(
+            sort_store.contracts, [("scanned_service_type", "asc")]
+        )
+        service_types = [sort_store._sort_field_value(c, "scanned_service_type") for c in result]
+        assert service_types[:4] == [
+            "air_transport",
+            "cleaning_services",
+            "construction_services",
+            "waste_services",
+        ]
+        assert service_types[4] is None
+
+    def test_sort_scanned_subtype_alphabetical(self, sort_store: DataStore):
+        """scanned_service_subtype sorts alphabetically with None values last."""
+        result = sort_store.sort_contracts(
+            sort_store.contracts, [("scanned_service_subtype", "asc")]
+        )
+        service_subtypes = [sort_store._sort_field_value(c, "scanned_service_subtype") for c in result]
+        assert service_subtypes[:4] == ["airfield", "bins", "bridges", "zebra"]
+        assert service_subtypes[4] is None
 
     def test_sort_iso_date_string_ordering(self, sort_store: DataStore):
         """ISO date strings sort correctly as plain strings."""

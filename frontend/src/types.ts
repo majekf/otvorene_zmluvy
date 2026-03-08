@@ -7,6 +7,9 @@
 export interface Contract {
   contract_id: string | null;
   contract_title: string | null;
+  scanned_suggested_title?: string | null;
+  scanned_service_type?: string | null;
+  scanned_service_subtype?: string | null;
   contract_number: string | null;
   buyer: string | null;
   supplier: string | null;
