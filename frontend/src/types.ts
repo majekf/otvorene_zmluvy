@@ -4,18 +4,78 @@
  * Mirrors the backend Pydantic models and API response shapes.
  */
 
+export interface Subcontractor {
+  name: string;
+  ico?: string | null;
+}
+
+export interface TenderDocument {
+  document_name: string;
+  document_title: string;
+  document_type: string;
+  file_size: string | null;
+  uploaded_at: string;
+  link: string;
+  is_external_link: boolean;
+}
+
+export interface TenderParticipant {
+  ico: string | null;
+  name: string;
+  proposed_sum: string | null;
+  proposed_sum_eur: number | null;
+}
+
+export interface TenderPart {
+  part_number: number | null;
+  document: TenderDocument | null;
+  participants: TenderParticipant[] | null;
+  notes: string | null;
+}
+
+export interface Tender {
+  tender_id: string;
+  tender_url: string | null;
+  page_title: string | null;
+  notice_id: string | null;
+  subject_name: string | null;
+  file_reference: string | null;
+  procedure_type: string | null;
+  template_type: string | null;
+  procurement_type: string | null;
+  procurement_result: string | null;
+  estimated_value: string | null;
+  main_cpv: string | null;
+  is_divided_into_parts: string | null;
+  electronic_auction: string | null;
+  central_procurement: string | null;
+  nuts: string | null;
+  short_description: string | null;
+  evaluation_criterion: string | null;
+  evaluation_price_basis: string | null;
+  offer_submission_deadline: string | null;
+  planned_opening_time: string | null;
+  result_document_count: number | null;
+  documents: TenderDocument[];
+  parts: TenderPart[];
+}
+
 export interface Contract {
   contract_id: string | null;
   contract_title: string | null;
-  scanned_suggested_title?: string | null;
-  scanned_service_type?: string | null;
-  scanned_service_subtype?: string | null;
   contract_number: string | null;
+  contract_number_detail: string | null;
+  contract_type: string | null;
   buyer: string | null;
+  buyer_detail: string | null;
   supplier: string | null;
+  supplier_detail: string | null;
   price_numeric_eur: number | null;
   price_raw: string | null;
   published_date: string | null;
+  published_day: string | null;
+  published_month: string | null;
+  published_year: string | null;
   category: string;
   award_type: string;
   pdf_text_summary: string;
@@ -27,8 +87,30 @@ export interface Contract {
   date_effective: string | null;
   date_valid_until: string | null;
   pdf_url: string | null;
+  pdf_urls: string[] | null;
   pdf_text: string | null;
   scraped_at: string | null;
+  rezort: string | null;
+  // Scanned / LLM-enriched fields
+  scanned_suggested_title?: string | null;
+  scanned_service_type?: string | null;
+  scanned_service_subtype?: string | null;
+  scanned_related_contract_number?: string | null;
+  scanned_supplier_ico?: string | null;
+  scanned_contract_value?: number | null;
+  scanned_payment_reason?: string | null;
+  scanned_contract_type?: string | null;
+  scanned_summary?: string | null;
+  scanned_subcontractors?: Subcontractor[] | null;
+  // Subcontractor (expanded)
+  subcontractor?: string | null;
+  ico_subcontractor?: string | null;
+  // Public procurement / tender linkage
+  public_procurement_id?: string | number | null;
+  public_procurement_portal?: string | null;
+  public_procurement_url?: string | null;
+  // Embedded tender (returned by /api/contracts/{id} when a match exists)
+  _tender?: Tender | null;
 }
 
 export interface FilterState {

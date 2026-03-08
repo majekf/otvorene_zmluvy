@@ -23,6 +23,7 @@ import type {
   RuleEvaluationResponse,
   RulePreset,
   Contract,
+  Tender,
   TreemapNode,
   TrendsResponseWithOverlays,
   FilterOptionsResponse,
@@ -88,6 +89,10 @@ export async function fetchContracts(
 
 export async function fetchContract(id: string): Promise<Contract> {
   return get<Contract>(`/api/contracts/${encodeURIComponent(id)}`);
+}
+
+export async function fetchTender(id: string): Promise<Tender> {
+  return get<Tender>(`/api/tenders/${encodeURIComponent(id)}`);
 }
 
 // ── Aggregations ────────────────────────────────────────────────────

@@ -428,14 +428,29 @@ def get_contract(
     contract_id: str,
     store: DataStore = Depends(get_store),
 ):
-    """Single contract by ID."""
+    """Single contract by ID. Embeds matching tender under '_tender' key."""
     for c in store.contracts:
         if c.contract_id == contract_id:
-            return c.model_dump()
+            result = c.model_dump()
+            tenders_index: Dict[str, Any] = getattr(app.state, "tenders", {})
+            pid = str(result.get("public_procurement_id") or "").strip()
+            if pid and pid in tenders_index:
+                result["_tender"] = tenders_index[pid]
+            return result
     raise HTTPException(
         status_code=404,
         detail=f"Contract {contract_id} not found",
     )
+
+
+@app.get("/api/tenders/{tender_id}")
+def get_tender(tender_id: str):
+    """Single tender by ID."""
+    tenders_index: Dict[str, Any] = getattr(app.state, "tenders", {})
+    tender = tenders_index.get(tender_id)
+    if tender is None:
+        raise HTTPException(status_code=404, detail=f"Tender {tender_id} not found")
+    return tender
 
 
 # ── Endpoints — Aggregations ────────────────────────────────────────
