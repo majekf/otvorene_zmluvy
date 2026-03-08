@@ -14,7 +14,9 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 
+import src.api as _api_module
 from src.api import app, get_store
+from src.chatbot.llm import MockLLMClient
 from src.engine import DataStore
 from src.models import FilterState
 
@@ -32,7 +34,11 @@ def _inject_sample_store():
     app.dependency_overrides[get_store] = lambda: store
     # Also set app.state.store for WebSocket handler (accesses it directly)
     app.state.store = store
+    # Force mock LLM so tests are deterministic regardless of .env API keys
+    _original_llm = _api_module._llm_client
+    _api_module._llm_client = MockLLMClient()
     yield
+    _api_module._llm_client = _original_llm
     app.dependency_overrides.clear()
 
 
@@ -192,11 +198,10 @@ class TestChatbotWorkflow:
             })
             # Read frames until we get a 'done' frame
             frames = []
-            for _ in range(200):  # safety limit (mock may stream many tokens)
+            while True:
                 try:
                     text = ws.receive_text()
-                    import json as _json
-                    frame = _json.loads(text)
+                    frame = json.loads(text)
                     frames.append(frame)
                     if frame.get("type") in ("done", "error"):
                         break
