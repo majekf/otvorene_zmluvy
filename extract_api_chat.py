@@ -24,6 +24,108 @@ MODEL_NAME = "gpt-4o-mini"
 DEBUG_PRINT_FULL_TEXT = False
 DEBUG_TEXT_PREVIEW = 1500
 
+SERVICE_TAXONOMY: Dict[str, List[str]] = {
+    "Stavebníctvo a rekonštrukcia": [
+        "výstavba",
+        "rekonštrukcia",
+        "oprava a údržba budov",
+        "zateplenie a energetická obnova",
+        "inžinierske práce",
+    ],
+    "Infraštruktúra a cesty": [
+        "oprava ciest a chodníkov",
+        "cestná infraštruktúra",
+        "kanalizácia a vodovod",
+        "vodné hospodárstvo",
+    ],
+    "Informačné technológie": [
+        "vývoj softvéru a informačných systémov",
+        "licencie a softvérové produkty",
+        "servery a hardvér",
+        "cloudové služby",
+        "kybernetická bezpečnosť",
+        "telekomunikácie",
+    ],
+    "Doprava a vozidlá": [
+        "nákup vozidiel",
+        "prenájom vozidiel",
+        "verejná doprava",
+        "preprava a logistika",
+        "dopravné služby",
+    ],
+    "Energie a médiá": [
+        "elektrická energia",
+        "plyn",
+        "teplo",
+        "energetické služby",
+    ],
+    "Technická údržba a servis": [
+        "opravy a údržba zariadení",
+        "servisné práce",
+        "technická správa",
+    ],
+    "Správa a prevádzka nehnuteľností": [
+        "správa budov a priestorov",
+        "prenájom budov a priestorov",
+        "upratovacie a hygienické služby",
+        "odpadové hospodárstvo",
+    ],
+    "Nákup tovaru a vybavenia": [
+        "zdravotnícke vybavenie a materiál",
+        "kancelárske vybavenie a nábytok",
+        "technika a zariadenia",
+        "oblečenie, uniformy a ochranné pomôcky",
+        "materiál a spotrebný tovar",
+    ],
+    "Odborné a poradenské služby": [
+        "právne služby",
+        "audit a účtovníctvo",
+        "poradenstvo a konzultácie",
+        "projektovanie a inžiniering",
+        "znalecké posudky a expertízy",
+    ],
+    "Vzdelávanie a rozvoj": [
+        "školenia a kurzy",
+        "zvyšovanie kvalifikácie",
+        "vzdelávacie programy",
+    ],
+    "Zdravotná a sociálna starostlivosť": [
+        "zdravotná starostlivosť",
+        "sociálne služby",
+        "rehabilitácia",
+        "opatrovateľská starostlivosť",
+        "dodávka liekov a zdravotníckeho materiálu",
+    ],
+    "Bezpečnosť a ochrana": [
+        "bezpečnostné služby",
+        "kamerové systémy",
+        "bezpečnostné systémy",
+        "požiarna ochrana",
+    ],
+    "Marketing a komunikácia": [
+        "reklama a marketing",
+        "PR a mediálna komunikácia",
+        "vydavateľské a tlačové služby",
+    ],
+    "Potraviny a stravovanie": [
+        "dodávka potravín",
+        "stravovacie služby",
+        "catering",
+    ],
+}
+
+VALID_SERVICE_TYPES = set(SERVICE_TAXONOMY.keys())
+VALID_SERVICE_SUBTYPES = {
+    subtype
+    for subtype_list in SERVICE_TAXONOMY.values()
+    for subtype in subtype_list
+}
+SUBTYPE_TO_TYPE = {
+    subtype: service_type
+    for service_type, subtype_list in SERVICE_TAXONOMY.items()
+    for subtype in subtype_list
+}
+
 
 def download_pdf(url: str, contract_id: str, pdf_dir: str) -> Optional[Path]:
     """Download PDF to local cache; reuse existing file when present."""
@@ -109,6 +211,13 @@ def _build_contract_prompt(text: str) -> str:
     """Build extraction prompt from contract text."""
     """Ask OpenAI to extract normalized contract metadata as JSON."""
     snippet = text[:22000]
+    taxonomy_lines = []
+    for service_type, subtype_list in SERVICE_TAXONOMY.items():
+        taxonomy_lines.append(f"- {service_type}")
+        for subtype in subtype_list:
+            taxonomy_lines.append(f"  - {subtype}")
+    taxonomy_text = "\n".join(taxonomy_lines)
+
     return f"""
 Extract structured data from Slovak public procurement contract.
 
@@ -116,6 +225,7 @@ Return JSON:
 
 {{
   "service_type": "...",
+    "service_subtype": "...",
   "suggested_title": "...",
   "related_contract_number": "...",
   "supplier_ico": "...",
@@ -130,12 +240,44 @@ Rules:
 - Only explicit data
 - Missing -> null
 - ICO = 8 digits
+- `service_type` must be exactly one value from allowed TYPES below, else null.
+- `service_subtype` must be exactly one value from allowed SUBTYPES below, else null.
+- If both are present, subtype must belong to the selected type.
+
+ALLOWED TYPES AND SUBTYPES (use only these exact strings):
+{taxonomy_text}
 
 CONTRACT TEXT:
 ---
 {snippet}
 ---
 """
+
+
+def _normalize_service_fields(ai_data: Dict[str, Any]) -> None:
+    """Ensure service_type and service_subtype match allowed taxonomy."""
+    raw_type = ai_data.get("service_type")
+    raw_subtype = ai_data.get("service_subtype")
+
+    service_type = raw_type.strip() if isinstance(raw_type, str) else None
+    service_subtype = raw_subtype.strip() if isinstance(raw_subtype, str) else None
+
+    if service_type not in VALID_SERVICE_TYPES:
+        service_type = None
+
+    if service_subtype not in VALID_SERVICE_SUBTYPES:
+        service_subtype = None
+
+    if service_subtype and not service_type:
+        service_type = SUBTYPE_TO_TYPE.get(service_subtype)
+
+    if service_type and service_subtype:
+        expected_type = SUBTYPE_TO_TYPE.get(service_subtype)
+        if expected_type != service_type:
+            service_subtype = None
+
+    ai_data["service_type"] = service_type
+    ai_data["service_subtype"] = service_subtype
 
 
 def analyze_contract(text: str, client: OpenAI, model_name: str) -> Dict[str, Any]:
@@ -201,7 +343,9 @@ async def analyze_contracts_batch_async(
 
 def add_scanned_fields(contract: Dict[str, Any], ai_data: Dict[str, Any]) -> None:
     """Map AI extraction output to persistent scanned_* fields."""
+    _normalize_service_fields(ai_data)
     contract["scanned_service_type"] = ai_data.get("service_type")
+    contract["scanned_service_subtype"] = ai_data.get("service_subtype")
     contract["scanned_suggested_title"] = ai_data.get("suggested_title")
     contract["scanned_related_contract_number"] = ai_data.get("related_contract_number")
     contract["scanned_supplier_ico"] = ai_data.get("supplier_ico")
