@@ -542,7 +542,7 @@ class TestFilterState:
 
 
 class TestSampleDataSmoke:
-    """Smoke tests using the real sample_contracts.json."""
+    """Smoke tests using the real test_data.json."""
 
     @pytest.fixture
     def sample_client(self):
@@ -550,9 +550,8 @@ class TestSampleDataSmoke:
         import os
 
         data_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "data",
-            "sample_contracts.json",
+            os.path.dirname(__file__),
+            "test_data.json",
         )
         ds = DataStore(data_path)
         app.dependency_overrides[get_store] = lambda: ds

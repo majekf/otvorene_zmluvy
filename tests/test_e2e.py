@@ -21,7 +21,7 @@ from src.models import FilterState
 # ── Helpers ──────────────────────────────────────────────────────────
 
 SAMPLE_DATA_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), "data", "sample_contracts.json"
+    os.path.dirname(__file__), "test_data.json"
 )
 
 
