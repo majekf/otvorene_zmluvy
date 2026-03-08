@@ -353,8 +353,9 @@ Full suite: 161 tests (42 Phase 2 + 80 Phase 1 + 39 Phase 0) — all passing.
 | 4.13 | Frontend: `ConditionBuilder` component — no-code field/operator/value rows, add/remove, AND/OR toggle | ✅ DONE |
 | 4.14 | Frontend: `RuleBadge` component — small badge on contract/vendor rows explaining which rules fired | ✅ DONE |
 | 4.15 | Frontend: `SeverityIndicator` component — visual severity score (color-coded) on contract rows | ✅ DONE |
+| 4.16 | Frontend: Extract Rule Builder into dedicated `RuleBuilderView` page (`/rules`) — `FilterBar` on top (shared via `FilterContext`), `RulePanel` + `ConditionBuilder` side by side; rule builder removed from `Dashboard.tsx`; nav link "Rule Builder" added to top bar; route `/rules` added to `App.tsx` | ✅ DONE |
 
-#### Unit Tests for Phase 4 — ✅ All 51 tests passing (37 backend + 14 frontend)
+#### Unit Tests for Phase 4 — ✅ All 63 tests passing (37 backend + 26 frontend)
 
 | Test | Coverage | Result |
 |------|----------|--------|
@@ -370,6 +371,7 @@ Full suite: 161 tests (42 Phase 2 + 80 Phase 1 + 39 Phase 0) — all passing.
 | `test_rules.py::TestRulesAPI` (6 tests) | GET /api/rules/presets, POST /api/rules/evaluate, POST /api/rules/custom, error handling | ✅ PASS |
 | `RulePanel.test.tsx` (6 tests) | Renders presets, slider changes params, evaluate calls API, displays flags, loading state, error state | ✅ PASS |
 | `ConditionBuilder.test.tsx` (8 tests) | Add/remove rows, AND/OR toggle, field/operator/value selection, evaluate calls API, serialization, empty state, result display | ✅ PASS |
+| `RuleBuilderView.test.tsx` (12 tests) | Page container, filter bar, rule panel & condition builder rendering, no toggle button, no dashboard elements (summary strip, charts), preset loading, preset display, add-condition & evaluate buttons | ✅ PASS |
 
 #### Unlocks
 

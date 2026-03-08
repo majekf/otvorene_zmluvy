@@ -18,8 +18,6 @@ import TreemapChart from '../components/TreemapChart';
 import BarChart from '../components/BarChart';
 import CategoryAccordion from '../components/CategoryAccordion';
 import AccordionContracts from '../components/AccordionContracts';
-import RulePanel from '../components/RulePanel';
-import ConditionBuilder from '../components/ConditionBuilder';
 import { formatEur } from '../utils';
 import { TableSkeleton, ChartSkeleton, SummarySkeleton } from '../components/LoadingSkeleton';
 
@@ -60,7 +58,6 @@ export default function Dashboard() {
   const [treemapData, setTreemapData] = useState<TreemapNode | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [showRules, setShowRules] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Sync state → URL
@@ -190,28 +187,6 @@ export default function Dashboard() {
           )}
         />
       )}
-
-      {/* Rule Builder (Phase 4) */}
-      <div className="pt-6">
-        <button
-          className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-primary-600 transition-colors mb-4"
-          onClick={() => setShowRules(!showRules)}
-          data-testid="toggle-rules"
-        >
-          <svg className={`w-4 h-4 transition-transform duration-200 ${showRules ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
-          {showRules ? 'Hide Pattern Detection' : 'Show Pattern Detection'}
-        </button>
-        {showRules && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in">
-            <div className="glass-card p-5">
-              <RulePanel filters={filters} />
-            </div>
-            <div className="glass-card p-5">
-              <ConditionBuilder filters={filters} />
-            </div>
-          </div>
-        )}
-      </div>
 
       {loading && (
         <div className="text-center text-slate-400 text-sm py-6" data-testid="loading-indicator">

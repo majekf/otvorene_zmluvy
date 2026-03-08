@@ -31,6 +31,12 @@ vi.mock('../pages/GlobalView', () => ({
 vi.mock('../pages/AllContracts', () => ({
   default: () => <div data-testid="all-contracts-page">AllContracts</div>,
 }));
+vi.mock('../pages/CompareView', () => ({
+  default: () => <div data-testid="compare-view-page">CompareView</div>,
+}));
+vi.mock('../pages/RuleBuilderView', () => ({
+  default: () => <div data-testid="rule-builder-view-page">RuleBuilderView</div>,
+}));
 
 function renderApp(route: string) {
   return render(
@@ -86,6 +92,11 @@ describe('App routing', () => {
     expect(screen.getByTestId('all-contracts-page')).toBeInTheDocument();
   });
 
+  it('routes /rules to RuleBuilderView', () => {
+    renderApp('/rules');
+    expect(screen.getByTestId('rule-builder-view-page')).toBeInTheDocument();
+  });
+
   it('renders navigation links', () => {
     renderApp('/');
     const nav = screen.getByTestId('main-nav');
@@ -95,6 +106,7 @@ describe('App routing', () => {
     expect(within(nav).getByText('Benchmark')).toBeInTheDocument();
     expect(within(nav).getByText('Trends')).toBeInTheDocument();
     expect(within(nav).getByText('Rankings')).toBeInTheDocument();
+    expect(within(nav).getByText('Rule Builder')).toBeInTheDocument();
   });
 
   it('renders footer', () => {

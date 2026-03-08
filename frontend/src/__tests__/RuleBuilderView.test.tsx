@@ -1,0 +1,146 @@
+/**
+ * Tests for RuleBuilderView page
+ *
+ * Covers: rendering, filter bar integration, RulePanel and ConditionBuilder
+ * panels, loading states, and absence of dashboard-specific elements.
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import RuleBuilderView from '../pages/RuleBuilderView';
+import { FilterProvider } from '../FilterContext';
+import * as api from '../api';
+
+vi.mock('../api');
+
+const mockPresets = {
+  presets: [
+    {
+      id: 'threshold_proximity',
+      name: 'Threshold Proximity',
+      description: 'Flags contracts near a threshold.',
+      params: { threshold_eur: 100000, proximity_pct: 10 },
+    },
+    {
+      id: 'vendor_concentration',
+      name: 'Vendor Concentration',
+      description: 'Top vendors holding too much spend.',
+      params: { top_n: 1, max_share_pct: 60 },
+    },
+  ],
+};
+
+function renderPage(route = '/rules') {
+  return render(
+    <MemoryRouter initialEntries={[route]}>
+      <FilterProvider>
+        <Routes>
+          <Route path="/rules" element={<RuleBuilderView />} />
+        </Routes>
+      </FilterProvider>
+    </MemoryRouter>,
+  );
+}
+
+describe('RuleBuilderView', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.fetchRulePresets).mockResolvedValue(mockPresets);
+    vi.mocked(api.fetchAggregations).mockResolvedValue({
+      group_by: '',
+      results: [],
+      summary: { contract_count: 0, total_spend: 0, avg_value: 0, max_value: 0 },
+    });
+    vi.mocked(api.fetchInstitutions).mockResolvedValue([]);
+    vi.mocked(api.fetchVendors).mockResolvedValue([]);
+    vi.mocked(api.fetchFilterOptions).mockResolvedValue({
+      institutions: [], categories: [], vendors: [],
+      institution_icos: [], vendor_icos: [],
+      institution_ico_map: {}, vendor_ico_map: {},
+      institution_counts: {}, vendor_counts: {},
+      institution_ico_counts: {}, vendor_ico_counts: {},
+      category_counts: {}, award_types: [],
+    });
+  });
+
+  // ── Rendering ─────────────────────────────────────────────────────
+
+  it('renders the page container', () => {
+    renderPage();
+    expect(screen.getByTestId('rule-builder-view')).toBeInTheDocument();
+  });
+
+  it('renders the filter bar', () => {
+    renderPage();
+    expect(screen.getByTestId('filter-bar')).toBeInTheDocument();
+  });
+
+  it('renders the rule panel', async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('rule-panel')).toBeInTheDocument();
+    });
+  });
+
+  it('renders the condition builder', () => {
+    renderPage();
+    expect(screen.getByTestId('condition-builder')).toBeInTheDocument();
+  });
+
+  // ── Panels always visible (no toggle) ─────────────────────────────
+
+  it('does NOT have a toggle-rules button', () => {
+    renderPage();
+    expect(screen.queryByTestId('toggle-rules')).not.toBeInTheDocument();
+  });
+
+  it('rule panel and condition builder are immediately visible without toggling', async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('rule-panel')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('condition-builder')).toBeInTheDocument();
+  });
+
+  // ── Absent dashboard-specific elements ────────────────────────────
+
+  it('does NOT render summary strip', () => {
+    renderPage();
+    expect(screen.queryByTestId('summary-strip')).not.toBeInTheDocument();
+  });
+
+  it('does NOT render treemap or bar chart', () => {
+    renderPage();
+    expect(screen.queryByTestId('treemap-chart')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('bar-chart')).not.toBeInTheDocument();
+  });
+
+  // ── Rule presets loaded ───────────────────────────────────────────
+
+  it('loads rule presets on mount', async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(api.fetchRulePresets).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('displays preset rule names after loading', async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Threshold Proximity')).toBeInTheDocument();
+      expect(screen.getByText('Vendor Concentration')).toBeInTheDocument();
+    });
+  });
+
+  // ── Condition builder elements ────────────────────────────────────
+
+  it('renders add-condition button', () => {
+    renderPage();
+    expect(screen.getByTestId('add-condition')).toBeInTheDocument();
+  });
+
+  it('renders custom evaluate button', () => {
+    renderPage();
+    expect(screen.getByTestId('custom-evaluate-btn')).toBeInTheDocument();
+  });
+});
