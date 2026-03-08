@@ -41,6 +41,8 @@ function filterParams(filters: FilterState): Record<string, string> {
   if (filters.date_from) p.date_from = filters.date_from;
   if (filters.date_to) p.date_to = filters.date_to;
   if (filters.categories?.length) p.categories = filters.categories.join('|');
+  if (filters.scanned_service_types?.length) p.scanned_service_types = filters.scanned_service_types.join('|');
+  if (filters.scanned_service_subtypes?.length) p.scanned_service_subtypes = filters.scanned_service_subtypes.join('|');
   if (filters.vendors?.length) p.vendors = filters.vendors.join('|');
   if (filters.institution_icos?.length) p.institution_icos = filters.institution_icos.join('|');
   if (filters.vendor_icos?.length) p.vendor_icos = filters.vendor_icos.join('|');

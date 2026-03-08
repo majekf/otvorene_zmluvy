@@ -28,6 +28,7 @@ interface ClusteredBarChartProps {
   metric?: CompareMetric;
   labelA?: string;
   labelB?: string;
+  onSelectGroup?: (groupValue: string) => void;
 }
 
 function contractsKey(metric: CompareMetric): keyof CompareAggregationRow {
@@ -43,6 +44,7 @@ export default function ClusteredBarChart({
   metric = 'total_spend',
   labelA = 'Contracts',
   labelB = 'Subcontractors',
+  onSelectGroup,
 }: ClusteredBarChartProps) {
   if (!data.length) {
     return (
@@ -76,8 +78,28 @@ export default function ClusteredBarChart({
           <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 11 }} stroke="#94a3b8" />
           <Tooltip formatter={(v: number | undefined) => formatter(v)} contentStyle={{ borderRadius: '0.75rem', border: '1px solid #e2e8f0' }} />
           <Legend />
-          <Bar dataKey={labelA} fill="#3b82f6" radius={[0, 4, 4, 0]} />
-          <Bar dataKey={labelB} fill="#f97316" radius={[0, 4, 4, 0]} />
+          <Bar
+            dataKey={labelA}
+            fill="#3b82f6"
+            radius={[0, 4, 4, 0]}
+            cursor={onSelectGroup ? 'pointer' : 'default'}
+            onClick={(entry) => {
+              if (!onSelectGroup) return;
+              const name = (entry as { name?: unknown }).name;
+              if (typeof name === 'string' && name) onSelectGroup(name);
+            }}
+          />
+          <Bar
+            dataKey={labelB}
+            fill="#f97316"
+            radius={[0, 4, 4, 0]}
+            cursor={onSelectGroup ? 'pointer' : 'default'}
+            onClick={(entry) => {
+              if (!onSelectGroup) return;
+              const name = (entry as { name?: unknown }).name;
+              if (typeof name === 'string' && name) onSelectGroup(name);
+            }}
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>

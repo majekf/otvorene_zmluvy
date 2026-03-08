@@ -139,7 +139,7 @@ describe('FilterBar', () => {
     fireEvent.click(screen.getByLabelText(/11111111/));
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({
-        institution_icos: undefined,
+        institution_icos: [],
       }),
     );
   });

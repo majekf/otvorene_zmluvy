@@ -42,7 +42,20 @@ const BAR_COLORS = ['#2563eb', '#16a34a', '#f59e0b', '#ef4444'];
 
 export default function BenchmarkView() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { filters, setFilters, institutions: ctxInstitutions, categories, vendors, awardTypes } = useFilterContext();
+  const {
+    filters,
+    setFilters,
+    institutions: ctxInstitutions,
+    categories,
+    scannedServiceTypes,
+    scannedServiceSubtypes,
+    vendors,
+    categoryCounts,
+    scannedServiceTypeCounts,
+    scannedServiceSubtypeCounts,
+    awardTypes,
+    optionsLoaded,
+  } = useFilterContext();
 
   // Parse initial state from URL
   const urlInstitutions = searchParams.get('institutions')?.split('|').filter(Boolean) ?? [];
@@ -83,6 +96,8 @@ export default function BenchmarkView() {
     if (filters.date_from) params.set('date_from', filters.date_from);
     if (filters.date_to) params.set('date_to', filters.date_to);
     if (filters.categories?.length) params.set('categories', filters.categories.join('|'));
+    if (filters.scanned_service_types?.length) params.set('scanned_service_types', filters.scanned_service_types.join('|'));
+    if (filters.scanned_service_subtypes?.length) params.set('scanned_service_subtypes', filters.scanned_service_subtypes.join('|'));
     if (filters.vendors?.length) params.set('vendors', filters.vendors.join('|'));
     if (filters.value_min !== undefined) params.set('value_min', String(filters.value_min));
     if (filters.value_max !== undefined) params.set('value_max', String(filters.value_max));
@@ -183,8 +198,14 @@ export default function BenchmarkView() {
         onChange={handleFilterChange}
         institutions={ctxInstitutions}
         categories={categories}
+        scannedServiceTypes={scannedServiceTypes}
+        scannedServiceSubtypes={scannedServiceSubtypes}
         vendors={vendors}
+        categoryCounts={categoryCounts}
+        scannedServiceTypeCounts={scannedServiceTypeCounts}
+        scannedServiceSubtypeCounts={scannedServiceSubtypeCounts}
         awardTypes={awardTypes}
+        optionsLoaded={optionsLoaded}
       />
 
       {/* Institution selection */}

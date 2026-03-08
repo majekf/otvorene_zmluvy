@@ -116,6 +116,12 @@ class FilterState(BaseModel):
     categories: Optional[List[str]] = Field(
         default=None, description="Selected category value(s)"
     )
+    scanned_service_types: Optional[List[str]] = Field(
+        default=None, description="Selected scanned service type value(s)"
+    )
+    scanned_service_subtypes: Optional[List[str]] = Field(
+        default=None, description="Selected scanned service subtype value(s)"
+    )
     vendors: Optional[List[str]] = Field(
         default=None, description="Selected vendor/supplier name(s)"
     )

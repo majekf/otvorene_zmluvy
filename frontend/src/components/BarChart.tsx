@@ -20,9 +20,10 @@ import { formatEur } from '../utils';
 interface BarChartProps {
   data: AggregationResult[];
   metric?: 'total_spend' | 'contract_count' | 'avg_value';
+  onSelectGroup?: (groupValue: string) => void;
 }
 
-export default function BarChart({ data, metric = 'total_spend' }: BarChartProps) {
+export default function BarChart({ data, metric = 'total_spend', onSelectGroup }: BarChartProps) {
   if (!data.length) {
     return <div data-testid="bar-chart" className="text-gray-400 text-sm p-4">No data for chart</div>;
   }
@@ -42,7 +43,17 @@ export default function BarChart({ data, metric = 'total_spend' }: BarChartProps
           <XAxis type="number" tickFormatter={(v: number) => formatEur(v)} />
           <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 12 }} />
           <Tooltip formatter={(v: number | undefined) => formatEur(v ?? 0)} />
-          <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+          <Bar
+            dataKey="value"
+            fill="#3b82f6"
+            radius={[0, 4, 4, 0]}
+            cursor={onSelectGroup ? 'pointer' : 'default'}
+            onClick={(entry) => {
+              if (!onSelectGroup) return;
+              const name = (entry as { name?: unknown }).name;
+              if (typeof name === 'string' && name) onSelectGroup(name);
+            }}
+          />
         </ReBarChart>
       </ResponsiveContainer>
     </div>

@@ -39,13 +39,16 @@ function mergeGroupFilter(
   const merged = { ...base };
   switch (groupBy) {
     case 'category':
-      merged.categories = [value];
+      merged.scanned_service_types = [value];
+      merged.scanned_service_subtypes = undefined;
       break;
     case 'supplier':
       merged.vendors = [value];
+      merged.vendor_icos = undefined;
       break;
     case 'buyer':
       merged.institutions = [value];
+      merged.institution_icos = undefined;
       break;
     case 'award_type':
       merged.award_types = [value];

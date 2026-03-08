@@ -34,6 +34,8 @@ export default function AllContracts() {
     setFilters,
     institutions: distinctInstitutions,
     categories: distinctCategories,
+    scannedServiceTypes,
+    scannedServiceSubtypes,
     vendors: distinctVendors,
     institutionIcos,
     vendorIcos,
@@ -44,6 +46,8 @@ export default function AllContracts() {
     institutionIcoCounts,
     vendorIcoCounts,
     categoryCounts,
+    scannedServiceTypeCounts,
+    scannedServiceSubtypeCounts,
     awardTypes: distinctAwardTypes,
     optionsLoaded,
   } = useFilterContext();
@@ -129,6 +133,10 @@ export default function AllContracts() {
         institutionIcoCounts={institutionIcoCounts}
         vendorIcoCounts={vendorIcoCounts}
         categoryCounts={categoryCounts}
+        scannedServiceTypes={scannedServiceTypes}
+        scannedServiceSubtypes={scannedServiceSubtypes}
+        scannedServiceTypeCounts={scannedServiceTypeCounts}
+        scannedServiceSubtypeCounts={scannedServiceSubtypeCounts}
         awardTypes={distinctAwardTypes}
         optionsLoaded={optionsLoaded}
       />

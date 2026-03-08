@@ -38,6 +38,8 @@ export interface FilterContextValue {
   // Dropdown option lists (populated once from the API).
   institutions: string[];
   categories: string[];
+  scannedServiceTypes: string[];
+  scannedServiceSubtypes: string[];
   vendors: string[];
   institutionIcos: string[];
   vendorIcos: string[];
@@ -48,6 +50,8 @@ export interface FilterContextValue {
   institutionIcoCounts: Record<string, number>;
   vendorIcoCounts: Record<string, number>;
   categoryCounts: Record<string, number>;
+  scannedServiceTypeCounts: Record<string, number>;
+  scannedServiceSubtypeCounts: Record<string, number>;
   awardTypes: string[];
   optionsLoaded: boolean;
 }
@@ -65,6 +69,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
 
   const [institutions, setInstitutions] = useState<string[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
+  const [scannedServiceTypes, setScannedServiceTypes] = useState<string[]>([]);
+  const [scannedServiceSubtypes, setScannedServiceSubtypes] = useState<string[]>([]);
   const [vendors, setVendors] = useState<string[]>([]);
   const [institutionIcos, setInstitutionIcos] = useState<string[]>([]);
   const [vendorIcos, setVendorIcos] = useState<string[]>([]);
@@ -75,6 +81,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [institutionIcoCounts, setInstitutionIcoCounts] = useState<Record<string, number>>({});
   const [vendorIcoCounts, setVendorIcoCounts] = useState<Record<string, number>>({});
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
+  const [scannedServiceTypeCounts, setScannedServiceTypeCounts] = useState<Record<string, number>>({});
+  const [scannedServiceSubtypeCounts, setScannedServiceSubtypeCounts] = useState<Record<string, number>>({});
   const [awardTypes, setAwardTypes] = useState<string[]>([]);
   const [optionsLoaded, setOptionsLoaded] = useState(false);
 
@@ -95,6 +103,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
         setInstitutionIcos(optionsRes.institution_icos.map((o) => o.value));
         setVendorIcos(optionsRes.vendor_icos.map((o) => o.value));
         setCategories(optionsRes.categories.map((o) => o.value));
+        setScannedServiceTypes(optionsRes.scanned_service_types.map((o) => o.value));
+        setScannedServiceSubtypes(optionsRes.scanned_service_subtypes.map((o) => o.value));
         setInstitutionIcoMap(instMap);
         setVendorIcoMap(vendMap);
         setAwardTypes(awardRes.results.map((r) => r.group_value));
@@ -108,28 +118,53 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   // cross-filtered server-side (self-filter excluded).
   useEffect(() => {
     let cancelled = false;
+    const maybePromise = fetchFilterOptions(filters) as Promise<{
+      institutions: { value: string; count: number }[];
+      vendors: { value: string; count: number }[];
+      institution_icos: { value: string; count: number }[];
+      vendor_icos: { value: string; count: number }[];
+      categories: { value: string; count: number }[];
+      scanned_service_types?: { value: string; count: number }[];
+      scanned_service_subtypes?: { value: string; count: number }[];
+    }> | undefined;
 
-    fetchFilterOptions(filters)
+    if (!maybePromise || typeof maybePromise.then !== 'function') {
+      setOptionsLoaded(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    maybePromise
       .then((res) => {
         if (cancelled) return;
         const mergeSelected = (base: string[], selected?: string[]) =>
           Array.from(new Set([...(selected || []), ...base]));
+
+        const serviceTypeOpts = res.scanned_service_types ?? [];
+        const serviceSubtypeOpts = res.scanned_service_subtypes ?? [];
 
         const inst = mergeSelected(res.institutions.map((o) => o.value), filters.institutions);
         const vend = mergeSelected(res.vendors.map((o) => o.value), filters.vendors);
         const instIco = mergeSelected(res.institution_icos.map((o) => o.value), filters.institution_icos);
         const vendIco = mergeSelected(res.vendor_icos.map((o) => o.value), filters.vendor_icos);
         const cat = mergeSelected(res.categories.map((o) => o.value), filters.categories);
+        const serviceTypes = mergeSelected(serviceTypeOpts.map((o) => o.value), filters.scanned_service_types);
+        const serviceSubtypes = mergeSelected(serviceSubtypeOpts.map((o) => o.value), filters.scanned_service_subtypes);
         setInstitutions(inst);
         setVendors(vend);
         setInstitutionIcos(instIco);
         setVendorIcos(vendIco);
         setCategories(cat);
+        setScannedServiceTypes(serviceTypes);
+        setScannedServiceSubtypes(serviceSubtypes);
         setInstitutionCounts(Object.fromEntries(res.institutions.map((o) => [o.value, o.count])));
         setVendorCounts(Object.fromEntries(res.vendors.map((o) => [o.value, o.count])));
         setInstitutionIcoCounts(Object.fromEntries(res.institution_icos.map((o) => [o.value, o.count])));
         setVendorIcoCounts(Object.fromEntries(res.vendor_icos.map((o) => [o.value, o.count])));
         setCategoryCounts(Object.fromEntries(res.categories.map((o) => [o.value, o.count])));
+        setScannedServiceTypeCounts(Object.fromEntries(serviceTypeOpts.map((o) => [o.value, o.count])));
+        setScannedServiceSubtypeCounts(Object.fromEntries(serviceSubtypeOpts.map((o) => [o.value, o.count])));
         setOptionsLoaded(true);
       })
       .catch(() => {
@@ -148,6 +183,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
         setFilters,
         institutions,
         categories,
+        scannedServiceTypes,
+        scannedServiceSubtypes,
         vendors,
         institutionIcos,
         vendorIcos,
@@ -158,6 +195,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
         institutionIcoCounts,
         vendorIcoCounts,
         categoryCounts,
+        scannedServiceTypeCounts,
+        scannedServiceSubtypeCounts,
         awardTypes,
         optionsLoaded,
       }}
