@@ -1,8 +1,12 @@
-# CRZ Scraper - Project Documentation
+# GovLens - Project Documentation
 
 ## Overview
 
-This is a production-ready web scraper for the Central Register of Contracts (Centrálny register zmlúv) at https://www.crz.gov.sk/. It extracts contract data, downloads PDFs, and outputs structured data in NDJSON format.
+GovLens is a full-stack application for exploring Slovak government contracts.
+
+The backend scrapes three public procurement portals — the Central Register of Contracts (CRZ, https://www.crz.gov.sk/), the JOSEPHINE eProcurement platform (https://josephine.proebiz.com/), and the UVO tender portal (https://www.uvo.gov.sk/) — enriches the data with LLM-generated summaries and rule-based anomaly flags, and exposes everything through a FastAPI REST + WebSocket API.
+
+The React/TypeScript frontend provides interactive dashboards, analytics views, a pattern-detection ("Red Flags") screen, a contracts-vs-subcontractors comparison view, and a WebSocket-backed contextual chatbot.
 
 ## Quick Start
 
@@ -18,12 +22,18 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 # 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Run scraper
+# 4. (Optional) Scrape contracts
 python scrape_crz.py --start-page 1 --max-pages 3 --out contracts.ndjson
+python scripts/migrate_ndjson.py -i contracts.ndjson -o data/contracts.json
 
-# 5. View results
-head -1 contracts.ndjson | jq .
+# 5. Start backend
+uvicorn src.api:app --reload --host 0.0.0.0 --port 8000
+
+# 6. Start frontend (separate terminal)
+cd frontend && npm install && npm run dev
 ```
+
+A **sample data file** (`data/sample_contracts.json`) ships with the repo so you can run the full UI without scraping first.
 
 ## Project Structure
 
@@ -31,71 +41,106 @@ head -1 contracts.ndjson | jq .
 crz_gov_scraping/
 ├── src/
 │   ├── __init__.py              # Package initialization
-│   ├── scraper.py               # Core scraping logic
-│   ├── models.py                # Pydantic v2 data models (Phase 0)
-│   ├── engine.py                # In-memory query & aggregation engine (Phase 1)
-│   ├── api.py                   # FastAPI REST endpoints (Phase 2)
-│   └── config.py                # Environment-variable config (Phase 2)
-├── frontend/                    # React + TypeScript + Vite (Phase 3)
+│   ├── scraper.py               # Core CRZ scraping logic + OCR helpers
+│   ├── models.py                # Pydantic v2 data models
+│   ├── engine.py                # In-memory query & aggregation engine
+│   ├── api.py                   # FastAPI REST + WebSocket endpoints
+│   ├── config.py                # Environment-variable config
+│   ├── rules/                   # Pattern-detection rule engine (Phase 4)
+│   │   ├── __init__.py
+│   │   ├── engine.py            # 6 preset rules + RuleEngine class
+│   │   └── builder.py           # No-code condition builder
+│   └── chatbot/                 # LLM chatbot backend (Phase 5)
+│       ├── __init__.py
+│       ├── context.py           # Scoped context builder (LRU-cached)
+│       ├── history.py           # Per-session chat history (in-memory)
+│       ├── llm.py               # LLM client abstraction (Mock + OpenAI)
+│       ├── protocol.py          # WebSocket frame models
+│       ├── scope.py             # Out-of-scope query enforcement
+│       └── usage.py             # Per-session token/cost accounting
+├── frontend/                    # React + TypeScript + Vite
 │   ├── src/
-│   │   ├── types.ts             # TypeScript interfaces (mirrors backend models)
+│   │   ├── types.ts             # TypeScript interfaces mirroring backend models
 │   │   ├── api.ts               # API client (fetch wrappers for all endpoints)
 │   │   ├── url-state.ts         # URL-state manager (parse/encode filters/sort/page)
 │   │   ├── utils.ts             # Formatting utilities (EUR, compact, date)
+│   │   ├── FilterContext.tsx    # Global filter state provider (React Context)
 │   │   ├── App.tsx              # Root layout with react-router routes
 │   │   ├── main.tsx             # Entry point with BrowserRouter
-│   │   ├── components/          # Reusable UI components
-│   │   │   ├── FilterBar.tsx    # Filter controls (institution, date, category, etc.)
-│   │   │   ├── GroupByControl.tsx # Group-by toggle buttons
-│   │   │   ├── TreemapChart.tsx # D3 treemap visualization with drill-down
-│   │   │   ├── BarChart.tsx     # Recharts horizontal bar chart
-│   │   │   ├── CategoryAccordion.tsx # Expandable group rows
-│   │   │   ├── ContractsTable.tsx # Multi-column sortable table
-│   │   │   ├── Pagination.tsx   # Page navigation
-│   │   │   ├── ErrorBoundary.tsx # Error boundary with retry (Phase 8)
-│   │   │   └── LoadingSkeleton.tsx # Skeleton loading screens (Phase 8)
-│   │   ├── pages/               # Route-level page components
-│   │   │   ├── Dashboard.tsx    # Home: filters + viz + table + pagination
-│   │   │   ├── ContractDetail.tsx # Contract info, PDF link, summary
-│   │   │   ├── InstitutionProfile.tsx # Institution stats, trend, vendors
-│   │   │   ├── VendorProfile.tsx # Vendor stats, trend, institutions
-│   │   │   ├── BenchmarkView.tsx # Institution benchmark comparison (Phase 6)
-│   │   │   ├── TimeView.tsx     # Time trends with overlays (Phase 6)
-│   │   │   └── GlobalView.tsx   # Global rankings table (Phase 6)
-│   │   └── __tests__/           # 135+ frontend unit tests (vitest)
+│   │   ├── components/          # Reusable UI components (17 total)
+│   │   │   ├── AccordionContracts.tsx  # Lazy-loaded contracts per accordion group
+│   │   │   ├── BarChart.tsx            # Recharts horizontal bar chart
+│   │   │   ├── CategoryAccordion.tsx   # Expandable group rows with spend totals
+│   │   │   ├── ChatBar.tsx             # Fixed-bottom WebSocket chatbot UI
+│   │   │   ├── ClusteredBarChart.tsx   # Vertical clustered bar (contracts vs subcontractors)
+│   │   │   ├── ConditionBuilder.tsx    # No-code custom rule UI
+│   │   │   ├── ContractsTable.tsx      # Multi-column sortable table
+│   │   │   ├── ErrorBoundary.tsx       # Error boundary with retry
+│   │   │   ├── FilterBar.tsx           # Filter controls (institution, date, category, etc.)
+│   │   │   ├── GroupByControl.tsx      # Group-by toggle buttons
+│   │   │   ├── LoadingSkeleton.tsx     # Shimmer/pulse skeleton screens
+│   │   │   ├── Pagination.tsx          # Page navigation
+│   │   │   ├── RuleBadge.tsx           # Rule severity badge chip
+│   │   │   ├── RulePanel.tsx           # Preset rules with param editors
+│   │   │   ├── SeverityIndicator.tsx   # Visual severity bar
+│   │   │   ├── TreemapChart.tsx        # D3 treemap with drill-down
+│   │   │   └── WorkspaceToolbar.tsx    # Share/Save/CSV/PDF toolbar
+│   │   └── pages/               # Route-level page components (10 total)
+│   │       ├── AllContracts.tsx        # Flat contracts browser with full table
+│   │       ├── BenchmarkView.tsx       # Institution benchmark comparison
+│   │       ├── CompareView.tsx         # Contracts vs Subcontractors comparison
+│   │       ├── ContractDetail.tsx      # Single contract detail
+│   │       ├── Dashboard.tsx           # Home: filters + viz + accordion + chat
+│   │       ├── GlobalView.tsx          # Global rankings table
+│   │       ├── InstitutionProfile.tsx  # Institution stats + trend + vendors
+│   │       ├── RedFlagsView.tsx        # Pattern-detection (rules + condition builder)
+│   │       ├── TimeView.tsx            # Time trends with overlays
+│   │       └── VendorProfile.tsx       # Vendor stats + trend + institutions
+│   │   └── __tests__/           # 184+ frontend unit tests (vitest, 25 files)
 │   ├── vite.config.ts           # Vite + Tailwind + vitest + proxy config
 │   └── package.json             # Node.js dependencies
 ├── scripts/
-│   ├── migrate_ndjson.py        # NDJSON → JSON migration (Phase 0)
-│   ├── start_dev.sh             # Unix dev startup script (Phase 8)
-│   └── start_dev.ps1            # Windows dev startup script (Phase 8)
+│   ├── expand_subcontractors.py    # Explode contracts to one row per subcontractor
+│   ├── migrate_jose_parts_once.py  # One-time Josephine parts migration
+│   ├── migrate_ndjson.py           # NDJSON → JSON migration + field backfill
+│   ├── start_dev.sh                # Unix dev startup script
+│   └── start_dev.ps1               # Windows dev startup script
 ├── tests/
 │   ├── __init__.py
-│   ├── test_parser.py           # Unit tests for parsing
-│   ├── test_integration.py      # Integration tests
-│   ├── test_models.py           # Model & sample-data tests (Phase 0)
-│   ├── test_migrate.py          # Migration script tests (Phase 0)
-│   ├── test_engine.py           # Engine tests (95 tests, Phase 1+6)
-│   ├── test_api.py              # API endpoint tests (59 tests, Phase 2+6)
-│   ├── test_e2e.py              # E2E integration tests (15 tests, Phase 8)
-│   └── test_performance.py      # Performance benchmarks (14 tests, Phase 8)
+│   ├── test_parser.py               # Unit tests for scraper parsing functions
+│   ├── test_integration.py          # Integration tests for scraper
+│   ├── test_models.py               # Model & sample-data tests
+│   ├── test_migrate.py              # Migration script tests
+│   ├── test_engine.py               # Engine tests (80+ tests)
+│   ├── test_api.py                  # API endpoint tests (46+ tests)
+│   ├── test_rules.py                # Rule engine & API tests (37 tests)
+│   ├── test_chatbot.py              # Chatbot module tests (49 tests + 2 skipped)
+│   ├── test_compare.py              # Contracts/subcontractors compare tests
+│   ├── test_expand_subcontractors.py # expand_subcontractors.py tests
+│   ├── test_josephine_scraper.py    # Josephine scraper tests
+│   ├── test_uvo_scraper.py          # UVO scraper tests
+│   ├── test_export.py               # CSV/PDF export tests (5 tests)
+│   ├── test_workspace.py            # Workspace save/load tests (5 tests)
+│   ├── test_url_state.py            # URL-state encoding tests (5 tests)
+│   ├── test_e2e.py                  # E2E integration tests (15 tests)
+│   └── test_performance.py          # Performance benchmarks (14 tests)
 ├── data/
-│   ├── sample_contracts.json    # 30+ seed contracts (Phase 0)
-│   └── pdfs/                    # Downloaded PDFs (auto-created)
-├── scrape_crz.py                # CLI entry point
+│   ├── contracts.json               # Migrated contracts (generated)
+│   ├── contracts_subcontractors.json # Subcontractor-expanded records (generated)
+│   ├── tenders.json                 # Josephine/UVO tender records (generated)
+│   └── pdfs/                        # Downloaded PDFs (auto-created)
+├── scrape_crz.py                # CLI entry point for CRZ scraper
+├── scrape_josephine.py          # Josephine procurement portal scraper
+├── scrape_uvo.py                # UVO tender portal scraper
+├── run_pipeline.py              # Orchestrates multi-source scraping pipeline
+├── extract_api_chat.py          # CLI tool for chatbot context extraction
 ├── requirements.in              # Unpinned dependencies
 ├── requirements.txt             # Pinned Python dependencies
-├── .env.example                 # Environment config template (Phase 0)
-├── .github/
-│   └── workflows/
-│       └── ci.yml               # GitHub Actions CI pipeline (Phase 8)
-├── Dockerfile                   # Multi-stage Docker build (Phase 8)
-├── docker-compose.yml           # Docker Compose config (Phase 8)
-├── Makefile                     # Common dev commands (Phase 8)
+├── Dockerfile                   # Multi-stage Docker build
+├── docker-compose.yml           # Docker Compose config
+├── Makefile                     # Common dev commands
 ├── README.md                    # User documentation
 ├── ARCHITECTURE.md              # This file
-├── setup.py                     # Setup validation script
-├── init_git.py                  # Git initialization script
 └── .gitignore                   # Git ignore rules
 ```
 
@@ -103,68 +148,53 @@ crz_gov_scraping/
 
 ### Core Components
 
-#### 1. `src/scraper.py` - Main Scraper Module
+#### 1. `src/scraper.py` — CRZ Scraper
 
 **Key Functions:**
 
-- **`parse_price(price_str)`**: Converts Slovak price format to float
-  - Input: "28 978,27 €"
-  - Output: 28978.27
-  
-- **`parse_slovak_date(day, month, year)`**: Creates ISO date from Slovak parts
-  - Handles Slovak month names (január, február, etc.)
-  
-- **`parse_date_from_text(date_str)`**: Parses DD.MM.YYYY format
-  - Returns ISO format (YYYY-MM-DD)
-  
-- **`fetch_page(url, session)`**: Downloads page with retries
-  - Exponential backoff on failure
-  - Max 3 retries with delay
-  
-- **`extract_listing_rows(html)`**: Extracts contracts from listing page
-  - Parses table with class `table_list`
-  - Returns list of contract dicts
-  
-- **`extract_contract_details(html, url)`**: Extracts info from detail page
-  - Finds "Identifikácia zmluvy" card
-  - Finds "Dátum" card
-  - Finds "Príloha" card (PDFs)
-  
-- **`download_and_extract_pdf(pdf_url, pdf_dir, session)`**: Downloads and processes PDF
-  - Downloads to `data/pdfs/`
-  - Extracts text with pdfplumber
-  - Truncates to 50,000 chars
-  
-- **`scrape_contracts(...)`**: Main orchestration function
-  - Paginates through listings
-  - Fetches detail pages
-  - Downloads PDFs
-  - Writes NDJSON output
+- **`parse_price(price_str)`**: Converts Slovak price format to float. Input: `"28 978,27 €"` → Output: `28978.27`
+- **`parse_slovak_date(day, month, year)`**: Creates ISO date from Slovak parts (handles Slovak month names)
+- **`parse_date_from_text(date_str)`**: Parses DD.MM.YYYY → ISO YYYY-MM-DD
+- **`fetch_page(url, session)`**: Downloads page with exponential backoff, max 3 retries
+- **`extract_listing_rows(html)`**: Extracts contracts from listing page (`table_list` CSS class)
+- **`extract_contract_details(html, url)`**: Extracts contract metadata + PDF URLs from detail page
+- **`extract_text_with_ocr(path)`**: PDF text extraction with OCR fallback using pypdfium2 + Pillow
+- **`download_and_extract_pdf(pdf_url, pdf_dir, session)`**: Downloads PDF, extracts text (truncated at 50k chars)
+- **`scrape_contracts(...)`**: Main orchestration — paginates, fetches details, downloads PDFs, writes NDJSON
 
-#### 2. `scrape_crz.py` - CLI Interface
+#### 2. `scrape_crz.py` — CRZ CLI Interface
 
-**Responsibilities:**
-- Parses command-line arguments
-- Configures logging
-- Calls main scraper function
-- Reports results
+Entry point for scraping crz.gov.sk. Parses CLI arguments, configures logging, calls `scrape_contracts()`.
 
-#### 3. `src/models.py` — Pydantic Data Models (Phase 0)
+#### 3. `scrape_josephine.py` — Josephine Scraper (Phase 9)
+
+Scrapes tender summaries from the JOSEPHINE eProcurement platform (https://josephine.proebiz.com/).
+
+- Translates Slovak field names to English via lookup dictionaries
+- Downloads result evaluation PDFs and enriches them with OpenAI GPT extraction
+- Outputs structured tender records with buyer info, evaluation criteria, CPV codes, subcontractor data
+- Reuses `extract_text_with_ocr` from `scraper.py`
+
+#### 4. `scrape_uvo.py` — UVO Scraper (Phase 9)
+
+Scrapes tender pages from the UVO procurement portal (https://www.uvo.gov.sk/).
+
+- Normalises UVO tender URLs to canonical form
+- Reuses helper functions from `scrape_josephine.py`
+- Extracts detail fields and document links
+
+#### 5. `src/models.py` — Pydantic Data Models
 
 **Key Models:**
 
-- **`Contract`**: Central record for a government contract. Combines listing-page, detail-page, PDF, and GovLens enrichment fields. Three new enrichment fields:
-  - `category` — LLM-assigned service category (default: `"not_decided"`)
-  - `pdf_text_summary` — LLM-generated summary (default: `"not_summarized"`)
-  - `award_type` — `tendered | direct_award | negotiated | unknown` (default: `"unknown"`)
-  - Uses `model_config = {"extra": "allow"}` so unknown keys from the scraper pass through.
+- **`Contract`**: Central record combining listing-page, detail-page, PDF, and GovLens enrichment fields.
+  - Enrichment fields: `category` (default `"not_decided"`), `pdf_text_summary` (default `"not_summarized"`), `award_type` (default `"unknown"`)
+  - `model_config = {"extra": "allow"}` — unknown keys pass through without error
+- **`FilterState`**: Global filter with `institutions`, `date_from`/`date_to`, `categories`, `vendors`, `institution_icos`, `vendor_icos`, `icos`, `value_min`/`value_max`, `award_types`, `text_search`
+- **`Institution`** / **`Vendor`**: Name, ICO, `contract_count`, `total_spend`
+- **`AggregationResult`**: `group_key`, `group_value`, counts, spend stats
 
-- **`Institution`**: Represents a buying institution (Objednávateľ) with `name`, `ico`, `contract_count`, `total_spend`.
-- **`Vendor`**: Represents a supplier (Dodávateľ) with the same shape.
-- **`FilterState`**: Encodes the shared global filter used across UI modes (date range, institutions, categories, vendors, value range, award types, text search).
-- **`AggregationResult`**: Result of a group-by + aggregation operation (`group_key`, `group_value`, counts, spend stats).
-
-#### 4. `scripts/migrate_ndjson.py` — Migration Tool (Phase 0)
+#### 6. `scripts/migrate_ndjson.py` — NDJSON Migration Tool
 
 Converts scraper NDJSON output to a JSON array and backfills missing GovLens fields:
 
@@ -172,113 +202,164 @@ Converts scraper NDJSON output to a JSON array and backfills missing GovLens fie
 python scripts/migrate_ndjson.py -i out.ndjson -o data/contracts.json
 ```
 
-- Reads one JSON object per line
-- Adds `category`, `pdf_text_summary`, `award_type` when missing
-- Preserves existing values
-- Skips malformed lines with a warning
+Reads one JSON object per line, adds `category`/`pdf_text_summary`/`award_type` when missing, preserves existing values, and skips malformed lines with a warning.
 
-#### 5. `data/sample_contracts.json` (Phase 0)
+#### 7. `scripts/expand_subcontractors.py` — Subcontractor Expansion (Phase 9)
 
-30+ realistic contract records with all fields populated, used as seed data for development and testing.
+Explodes each contract into one row per subcontractor:
 
-#### 6. `.env.example` (Phase 0)
+```bash
+python scripts/expand_subcontractors.py -i data/contracts.json -o data/contracts_subcontractors.json
+```
 
-Configuration template for future phases (LLM provider, API keys, server host/port, data paths).
+- Handles subcontractor values as plain strings, dicts, JSON-encoded strings, or comma/semicolon-delimited lists
+- Normalises subcontractor name and ICO from multiple possible key names
+- Remaps `subcontractor`/`ico_subcontractor` → `supplier`/`ico_supplier` so the engine reuses vendor logic unmodified
 
-#### 7. `src/engine.py` — In-Memory Query & Aggregation Engine (Phase 1)
+#### 8. `src/engine.py` — In-Memory Query & Aggregation Engine
 
 **Key Class: `DataStore`**
 
-Loads contracts from JSON into memory and provides fast querying.
-
 **Loading & Indexing:**
-- `DataStore(data_path)`: Load from JSON file at init
-- `load_from_list(records)`: Load from list of dicts (for testing)
+- `DataStore(data_path)` / `load_from_list(records)` — load JSON or list of dicts
 - Auto-builds lookup indices for institution, category, date
 
 **Filtering (`filter(FilterState)`):**
-- All filters are AND-combined; `None` means “no filter”
-- Supported: institution(s), date_from/to, categories, vendors, value_min/max, award_types, text_search
-
-**Search (`search(query)`):**
-- Case-insensitive substring search over `contract_title` and `pdf_text_summary`
+All filters are AND-combined; `None` means no filter.
+Supports: institution name(s), institution/vendor ICOs, date range, categories, vendors, value range, award types, text search.
 
 **Group By (`group_by(field, contracts?)`):**
-- Fields: `category`, `supplier`, `buyer`, `month`, `award_type`, `published_year`
-- Returns `Dict[str, List[Contract]]`
+Fields: `category`, `supplier`, `buyer`, `month`, `award_type`, `published_year` → `Dict[str, List[Contract]]`
 
 **Aggregations:**
 - `aggregate(contracts?)` → `{total_spend, contract_count, avg_value, max_value}`
 - `aggregate_groups(field)` → `List[AggregationResult]` sorted by total_spend desc
 - `top_n_vendors(n)` → `List[Vendor]`
-- `direct_award_rate(contracts?)` → `float` (0.0 – 1.0)
+- `direct_award_rate(contracts?)` → `float` (0.0–1.0)
 
 **Benchmark / Compare:**
-- `institutions()` / `vendors()` — list all with stats
-- `compare(institution_names, metric)` — side-by-side comparison
-- `compare_multi_metric(institution_names, metrics)` — multi-metric comparison (Phase 6)
-- `peer_group(institution_name, min_contracts)` — discover similar institutions (Phase 6)
+- `compare(institution_names, metric)` / `compare_multi_metric(institution_names, metrics)`
+- `peer_group(institution_name, min_contracts)` — discover similar institutions
 
 **Trends:**
-- `trend(granularity, contracts?, metric)` — time-series by month/quarter/year
-- `trend_multi_metric(granularity, contracts, metrics)` — multi-metric trends (Phase 6)
+- `trend(granularity, contracts?, metric)` — monthly/quarterly/yearly
+- `trend_multi_metric(granularity, contracts, metrics)` — multi-metric
 
 **Rankings:**
 - `rank_institutions(metric)` / `rank_vendors(metric)` — with rank numbers
-- `vendor_concentration_score(contracts, top_n)` — HHI-style concentration (Phase 6)
-- `fragmentation_score(contracts)` — many-small-contracts score (Phase 6)
+- `vendor_concentration_score(contracts, top_n)` — HHI-style
+- `fragmentation_score(contracts)` — many-small-contracts score
 - Metrics: `total_spend`, `contract_count`, `avg_value`, `max_value`, `direct_award_rate`, `vendor_concentration`, `fragmentation_score`
 
-**Example:**
-```bash
-python scrape_crz.py \
-  --start-page 1 \
-  --max-pages 10 \
-  --out contracts.ndjson \
-  --delay 0.5 \
-  --log-level INFO
-```
+**Sort:**
+- `sort_contracts(contracts, sort_spec)` — multi-column; `SORTABLE_FIELDS` whitelist; None values always last; strings case-insensitive
 
-#### 8. `src/api.py` — Backend REST API (Phase 2)
+#### 9. `src/rules/` — Pattern-Detection Rule Engine (Phase 4)
 
-FastAPI application exposing the DataStore engine over HTTP REST endpoints.
+**`src/rules/engine.py`** — `RuleEngine` class with 6 preset rules:
+
+| Rule ID | Name | Description |
+|---------|------|-------------|
+| `threshold_proximity` | Threshold Proximity | Contracts within X% of a legal procurement threshold |
+| `vendor_concentration` | Vendor Concentration | Top-N vendors hold > X% of institution spend |
+| `fragmentation` | Fragmentation | Many small contracts to the same vendor |
+| `overnight_turnaround` | Overnight Turnaround | Signed-to-published in < N hours |
+| `new_vendor_large` | New Vendor Large Contract | First-time vendor with value above threshold |
+| `round_number_clustering` | Round-Number Clustering | Statistical anomaly in round-number contract values |
+
+Each rule produces `RuleFlag` objects with `rule_id`, `rule_name`, `severity` (0.0–1.0), `description`, and optional `contract_id`/`vendor`/`institution`.
+
+`RuleResult` aggregates flags and provides `flags_for_contract(id)`, `flags_for_vendor(name)`, `severity_for_contract(id)`, `severity_for_vendor(name)`.
+
+**`src/rules/builder.py`** — `ConditionGroup` class for no-code custom rules:
+
+- Conditions: `field` / `operator` (`eq`, `ne`, `gt`, `ge`, `lt`, `le`, `contains`) / `value`
+- Supported fields: `price_numeric_eur`, `published_date`, `contract_title`, `buyer`, `supplier`, `category`, `award_type`, `date_concluded`, `date_published`, `date_effective`
+- Logic: `AND` or `OR` over a list of `Condition` objects; serialisable to/from JSON
+
+#### 10. `src/chatbot/` — LLM Chatbot Backend (Phase 5)
+
+**`llm.py`** — LLM client abstraction:
+- `MockLLMClient` — deterministic template response, no API calls (CI/demo default)
+- `OpenAIClient` — real OpenAI API with streaming + retry; activated by `LLM_PROVIDER=openai` + `OPENAI_API_KEY`
+- Factory: `create_llm_client(provider, api_key, model, temperature)`
+
+**`protocol.py`** — WebSocket frame models (Pydantic):
+- `StartFrame` — generation started (provider, degraded flag)
+- `TokenFrame` — single streamed token
+- `PartialUsageFrame` — mid-stream token count update
+- `DoneFrame` — complete response (content, provenance, scope_refusal, usage)
+- `ErrorFrame` — error message
+- `CancelFrame` — client → server abort signal
+
+**`context.py`** — Context builder with LRU cache (128 entries):
+- `build_scoped_context(store, filters)` — assembles a text prompt describing the current filtered contract set
+- Uses `FIELD_LABEL_MAP` for human-friendly field names
+
+**`scope.py`** — Out-of-scope query enforcement:
+- `check_scope(message, filters, store)` — detects when the user mentions institutions/vendors outside the active filter
+- Returns `ScopeRefusal` with structured suggestions
+
+**`history.py`** — Per-session chat history:
+- `InMemoryHistory` — default; LRU-eviction at 256 sessions
+- Optional Redis/Postgres backends via feature flags
+- API: `append(session_id, role, content)` / `get(session_id)` / `clear(session_id)`
+
+**`usage.py`** — Token/cost accounting (active when `CHAT_COST_TRACKING=true`):
+- Records `prompt_tokens`, `completion_tokens`, `total_cost_usd` per response per session
+
+#### 11. `src/api.py` — Backend REST + WebSocket API
+
+FastAPI application with two DataStore instances loaded at startup via lifespan handler.
 
 **App Setup:**
-- Lifespan handler loads DataStore at startup (graceful fallback if file missing)
-- CORS middleware allowing all origins (for frontend dev server)
-- Dependency injection for DataStore (`get_store`) and filter parsing (`parse_filters`)
-- Filter-state serialization utility (`encode_filter_state`)
+- Primary DataStore from `GOVLENS_DATA_PATH`
+- Optional subcontractors DataStore from `GOVLENS_SUBCONTRACTORS_DATA_PATH` (remaps `subcontractor` → `supplier` transparently)
+- CORS middleware allowing all origins
+- Dependency injection: `get_store()`, `get_sub_store()`, `parse_filters()`
+- Filter params use **pipe-separated** values (e.g. `institutions=OrgA|OrgB`)
 
-**Endpoints (17 total):**
+**Endpoints (27 total):**
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/contracts` | GET | Paginated, filterable contract list |
+| `/api/contracts` | GET | Paginated, filterable, sortable contract list |
 | `/api/contracts/{id}` | GET | Single contract detail (404 if not found) |
+| `/api/filter-options` | GET | Distinct slicer option lists with per-value counts |
 | `/api/aggregations` | GET | Group-by + filters → aggregated stats |
-| `/api/treemap` | GET | Hierarchical data for D3 treemap visualization |
-| `/api/benchmark` | GET | Compare institutions by metric (with min_contracts filter) |
-| `/api/benchmark/peers` | GET | Peer-group discovery for an institution (Phase 6) |
-| `/api/benchmark/compare` | GET | Multi-metric comparison across institutions (Phase 6) |
-| `/api/trends` | GET | Time-series by granularity, multi-metric, overlay dates (Phase 6 enhanced) |
-| `/api/rankings` | GET | Ranked list with filters, new metrics: vendor_concentration, fragmentation_score (Phase 6 enhanced) |
+| `/api/compare/aggregations` | GET | Contracts vs subcontractors side-by-side aggregations |
+| `/api/treemap` | GET | Hierarchical data for D3 treemap |
+| `/api/benchmark` | GET | Compare institutions by metric |
+| `/api/benchmark/peers` | GET | Peer-group discovery |
+| `/api/benchmark/compare` | GET | Multi-metric institution comparison |
+| `/api/trends` | GET | Time-series by granularity, multi-metric, overlay dates |
+| `/api/rankings` | GET | Ranked lists with pagination |
 | `/api/institutions` | GET | All institutions with stats |
 | `/api/institutions/{identifier}` | GET | Institution profile (by name or ICO) |
 | `/api/vendors` | GET | All vendors with stats |
 | `/api/vendors/{identifier}` | GET | Vendor profile (by name or ICO) |
+| `/api/categories` | GET | Distinct category list |
 | `/api/export/csv` | GET | Filtered CSV download |
-| `/api/export/pdf` | GET | PDF export (ReportLab-generated report with summary stats + contract table) |
-| `/api/workspace/save` | POST | Snapshot filters, sort, groupBy, mode, chart state, chat history → base64 token + JSON |
-| `/api/workspace/load` | GET | Restore workspace from base64 token (`?token=...`) |
+| `/api/export/pdf` | GET | PDF report via ReportLab |
+| `/api/workspace/save` | POST | Snapshot filters + UI state → base64 token |
+| `/api/workspace/load` | GET | Restore workspace from base64 token |
+| `/api/rules/presets` | GET | List the 6 preset rule definitions + default params |
+| `/api/rules/evaluate` | POST | Evaluate selected rules against filtered contracts |
+| `/api/rules/custom` | POST | Evaluate a custom `ConditionGroup` against filtered contracts |
+| `/api/chat/status` | GET | Chat provider status (provider, degraded, active features) |
+| `/api/chat/save` | POST | Export chat transcript + usage stats as JSON |
+| `/api/chat` | WebSocket | Streaming contextual chatbot |
 | `/api/filter-state` | GET | Debug: shows parsed/encoded filter state |
 
-**Filter Query Parameters (shared across filterable endpoints):**
-- `institutions` — Comma-separated buyer names
+**Filter Query Parameters (shared across all filterable endpoints):**
+- `institutions` — Pipe-separated buyer names
 - `date_from` / `date_to` — Date range (YYYY-MM-DD)
-- `categories` — Comma-separated categories
-- `vendors` — Comma-separated supplier names
+- `categories` — Pipe-separated categories
+- `vendors` — Pipe-separated supplier names
+- `institution_icos` / `vendor_icos` — Pipe-separated IČO values
+- `icos` — Pipe-separated IČO values (legacy alias)
 - `value_min` / `value_max` — EUR value range
-- `award_types` — Comma-separated award types
+- `award_types` — Pipe-separated award types
 - `text_search` — Full-text search query
 
 **Running the server:**
@@ -286,193 +367,176 @@ FastAPI application exposing the DataStore engine over HTTP REST endpoints.
 uvicorn src.api:app --reload --host 0.0.0.0 --port 8000
 ```
 
-#### 9. `src/config.py` — Application Configuration (Phase 2)
+#### 12. `src/config.py` — Application Configuration
 
-Loads settings from environment variables with defaults, using `python-dotenv` for `.env` file support.
+Loads settings from environment variables via `python-dotenv`. Key settings:
 
-**Settings:**
 - `GOVLENS_HOST` / `GOVLENS_PORT` — Server binding (default: `0.0.0.0:8000`)
-- `GOVLENS_DATA_PATH` — Path to contracts JSON (default: `data/sample_contracts.json`)
-- `LLM_PROVIDER` / `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` — LLM config (Phase 5)
+- `GOVLENS_DATA_PATH` — Primary contracts JSON (default: `data/sample_contracts.json`)
+- `GOVLENS_SUBCONTRACTORS_DATA_PATH` — Subcontractors JSON (optional, empty = disabled)
+- `LLM_PROVIDER` — `mock` (default) | `openai` | `anthropic`
+- `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` — API credentials
+- `OPENAI_MODEL` / `OPENAI_TEMPERATURE` — Model+temperature (default: `gpt-4.1-nano`, `0.2`)
+- `CHAT_STREAMING`, `CHAT_HISTORY_BACKEND`, `CHAT_PROVENANCE`, `CHAT_COST_TRACKING`, `CHAT_OBSERVABILITY`, `CHAT_MAX_MESSAGE_LENGTH` — Chatbot feature flags
 - `SCRAPER_PDF_DIR` / `SCRAPER_DELAY` — Scraper settings
 
-#### 10. `frontend/` — React Frontend (Phase 3)
+Auto-forces `LLM_PROVIDER=mock` when the selected provider has no API key configured.
 
-Single-page application built with React 18, TypeScript, Vite, and Tailwind CSS v4.
+#### 13. `frontend/` — React Frontend
 
 **Tech stack:**
-- **React 18** + TypeScript — component library and type safety
-- **Vite** — build tool with HMR, proxy `(/api → localhost:8000)`
-- **Tailwind CSS v4** — utility-first styling via `@tailwindcss/vite` plugin
-- **react-router-dom** — client-side routing with URL-state
-- **D3.js** — treemap visualization with drill-down
-- **Recharts** — bar charts, line charts for trends
-- **vitest** + `@testing-library/react` — 135 frontend unit tests
+- React 19 + TypeScript, Vite 7, Tailwind CSS v4 (`@tailwindcss/vite`), react-router-dom 7
+- D3.js 7 (treemap), Recharts 3 (bar/line charts)
+- vitest 3 + `@testing-library/react` — 184+ unit tests (25 test files)
 
-**Key modules:**
-- `types.ts` — TypeScript interfaces mirroring all backend Pydantic models
-- `api.ts` — Thin fetch wrappers for all 20 REST endpoints + `saveWorkspace()` / `loadWorkspace()`
-- `url-state.ts` — Parse/encode full UI state to/from URL query params (includes `mode` field for Phase 7)
+**Global State (`FilterContext.tsx`):**
+- `FilterProvider` wraps the app; exposes `filters`, `setFilters`, and pre-fetched dropdown option lists (institutions, vendors, categories, ICO maps, per-value counts)
+- Fetches `/api/filter-options` once and caches it for the session lifetime
+- Filters survive in-app navigation without re-encoding per page
+- Seeds from URL on first mount for deep-link support
+
+**Key Modules:**
+- `types.ts` — TypeScript interfaces mirroring all backend models (all phases)
+- `api.ts` — Thin fetch wrappers for all 27 REST endpoints + WebSocket URL helper; filter lists are pipe-joined
+- `url-state.ts` — Parse/encode full UI state to/from URL query params (filters, sort, groupBy, page, mode)
 - `utils.ts` — EUR formatting, compact numbers, date display
 
-**Components (8):**
-- `FilterBar` — Institution, date range, category, vendor, value range, award type, text search
-- `GroupByControl` — Toggle between 5 group-by dimensions
-- `TreemapChart` — D3 treemap with drill-down on click
-- `BarChart` — Recharts horizontal bar chart fallback
-- `CategoryAccordion` — Expandable group rows with spend totals
-- `ContractsTable` — Multi-column sortable table (click/Shift+click, direction arrows, priority badges)
+**Components (17):**
+- `AccordionContracts` — Mounts only when a group is expanded; fetches contracts for that group on demand
+- `BarChart` — Recharts horizontal bar chart
+- `CategoryAccordion` — Expandable group rows, each embedding `AccordionContracts`
+- `ChatBar` — Fixed bottom-bar WebSocket chatbot: streaming tokens, scope-refusal panel, source provenance, cancel, degraded-mode banner
+- `ClusteredBarChart` — Vertical Recharts clustered bar (contracts vs subcontractors)
+- `ConditionBuilder` — No-code custom rule UI, maps to `src/rules/builder.py`
+- `ContractsTable` — Multi-column sortable table (Shift+click multi-sort, priority badges ①②③)
+- `ErrorBoundary` — Wraps all routes; retry button + expandable error details
+- `FilterBar` — Institution/ICO, date range, category, vendor/ICO, value range, award type, text search
+- `GroupByControl` — Toggle between 5 group-by fields
+- `LoadingSkeleton` — `TableSkeleton`, `ChartSkeleton`, `CardSkeleton`, `SummarySkeleton` variants
 - `Pagination` — First/prev/next/last with page window
-- `WorkspaceToolbar` — Share (clipboard), Save Workspace (JSON download), Export CSV, Export PDF (Phase 7)
-- `ErrorBoundary` — React error boundary wrapping all routes, with retry button and expandable error details (Phase 8)
-- `LoadingSkeleton` — Shimmer/pulse skeleton screens with `TableSkeleton`, `ChartSkeleton`, `CardSkeleton`, `SummarySkeleton` variants (Phase 8)
+- `RuleBadge` — Severity chip (colour-coded)
+- `RulePanel` — Lists preset rules with param sliders; evaluates and displays flags
+- `SeverityIndicator` — Visual fill bar 0–100%
+- `TreemapChart` — D3 treemap with drill-down on click
+- `WorkspaceToolbar` — Share (clipboard URL), Save Workspace (JSON), Export CSV, Export PDF
 
-**Pages (4):**
-- `Dashboard` — Home: filters + viz + accordion + table + pagination + WorkspaceToolbar (Share/Save/CSV/PDF)
+**Pages (10):**
+- `Dashboard` — Home: filters + treemap/bar + category accordion + contracts table + pagination + WorkspaceToolbar + ChatBar
+- `AllContracts` — Flat contracts browser: FilterBar + ContractsTable + pagination (no chart/accordion layer)
 - `ContractDetail` — Full contract info, PDF link, summary, category/award badges
 - `InstitutionProfile` — Stats cards, spend trend line chart, top vendors bar chart, contracts table
 - `VendorProfile` — Stats cards, revenue trend, institutions served bar chart, contracts table
+- `BenchmarkView` — Institution benchmark comparison by metric
+- `TimeView` — Time trends with overlay date markers
+- `GlobalView` — Global rankings table (institutions or vendors)
+- `CompareView` — Contracts vs Subcontractors: clustered bar comparison by group-by field and metric
+- `RedFlagsView` — Pattern detection: `RulePanel` (preset rules) + `ConditionBuilder` (custom) side-by-side
 
 **Routing:**
-- `/` → Dashboard
-- `/contract/:id` → ContractDetail
-- `/institution/:id` → InstitutionProfile
-- `/vendor/:id` → VendorProfile
 
-#### 3. Tests
+| Path | Page |
+|------|------|
+| `/` | Dashboard |
+| `/contracts` | AllContracts |
+| `/contract/:id` | ContractDetail |
+| `/institution/:id` | InstitutionProfile |
+| `/vendor/:id` | VendorProfile |
+| `/benchmark` | BenchmarkView |
+| `/time` | TimeView |
+| `/rankings` | GlobalView |
+| `/compare` | CompareView |
+| `/red-flags` | RedFlagsView |
 
-**`tests/test_parser.py`**: Unit tests
-- Price parsing with various formats
-- Slovak date parsing
-- Date text parsing
+**ChatBar** is shown only on `/` (Dashboard). It opens a WebSocket to `/api/chat` and streams LLM tokens. It shows source provenance and scope-refusal suggestions when the LLM detects an out-of-scope query.
 
-**`tests/test_integration.py`**: Integration tests
-- Listing extraction
-- Detail extraction
-- Full smoke test
-- Output format validation
+#### 14. Tests
 
-**`tests/test_models.py`** (Phase 0): Model & sample-data tests
-- Contract defaults for enrichment fields
-- Validation and serialization round-trips
-- FilterState, AggregationResult, Institution, Vendor
-- Sample data file loading and contract validation
+**Backend (173+ passing, 18 test files):**
+- `test_parser.py` — price/date parsing, edge cases
+- `test_integration.py` — listing/detail extraction, full smoke test
+- `test_models.py` — Contract defaults, validation, FilterState, AggregationResult
+- `test_migrate.py` — field backfill, data preservation, edge cases
+- `test_engine.py` (80+) — filtering, search, grouping, aggregation, trends, rankings, sort, sample-data smoke tests
+- `test_api.py` (46+) — all endpoints, sort, pagination, benchmark, trends, rankings
+- `test_rules.py` (37) — 6 preset rules, severity scoring, condition builder, rules API
+- `test_chatbot.py` (49+2 skipped) — context builder, scope enforcement, LLM clients, history, protocol, usage, API, security
+- `test_compare.py` — `/api/compare/aggregations` with and without sub-store
+- `test_expand_subcontractors.py` — append-only expansion behavior
+- `test_josephine_scraper.py` — Josephine HTML parsing, URL detection
+- `test_uvo_scraper.py` — UVO detail fields, document table parsing, URL helpers
+- `test_export.py` (5) — CSV/PDF export content, filter, sort
+- `test_workspace.py` (5) — save/load round-trip, chat history, invalid token
+- `test_url_state.py` (5) — encode/decode round-trip, edge cases
+- `test_e2e.py` (15) — full workflow, chatbot, rule workflow
+- `test_performance.py` (14) — filter/aggregation/sort at 10k and 50k contracts
 
-**`tests/test_migrate.py`** (Phase 0): Migration script tests
-- Field backfill (category, pdf_text_summary, award_type)
-- Existing data preservation
-- Overwrite protection
-- Edge cases (blank lines, invalid JSON, empty input)
-
-**`tests/test_engine.py`** (Phase 1+6): Engine tests (95 tests)
-- Loading from JSON and in-memory lists
-- Filtering: institution, date range, value range, category, vendor, award type, text search, combined
-- Search: title, summary, case-insensitive
-- Group by: category, supplier, buyer, month, award_type
-- Aggregations: total spend, count, avg, max, grouped, top-N vendors, direct award rate
-- Institutions & vendors listing with stats
-- Compare / benchmark institutions
-- Trends: monthly, quarterly, yearly
-- Rankings: institutions & vendors by multiple metrics
-- Multi-column sort: ascending/descending, None-last, tie-breaking, case-insensitive strings, SORTABLE_FIELDS whitelist
-- Sample-data smoke tests and edge cases
-
-**`tests/test_api.py`** (Phase 2+6+7): API endpoint tests (46 tests)
-- Contracts: list (200), filter by institution, pagination, date range, text search, detail, not found (404)
-- Aggregations: group by category, with filter
-- Treemap: data structure, sub-grouping
-- Benchmark: peer comparison
-- Trends: time-series, with filter
-- Rankings: institutions, vendors
-- Institutions: list, profile by name, by ICO, not found
-- Vendors: list, profile, by ICO, not found
-- Export: CSV, CSV with filter, PDF returns application/pdf
-- Filter state: round-trip, empty encoding
-- Sample data smoke tests: contracts, institutions, rankings, CSV
-
-**`tests/test_workspace.py`** (Phase 7): Workspace save/load tests (5 tests)
-- Save and load round-trip restores identical filter state
-- Workspace snapshot includes chat history
-- Invalid token returns 400
-- Non-JSON base64 token returns 400
-- Minimal payload round-trip
-
-**`tests/test_export.py`** (Phase 7): Export tests (5 tests)
-- CSV export content and headers
-- CSV export respects filters
-- PDF export returns application/pdf
-- PDF export respects filters
-- PDF export with sort
-
-**`tests/test_url_state.py`** (Phase 7): URL-state encoding tests (5 tests)
-- Full state encode/decode round-trip
-- Empty FilterState returns empty dict
-- Page=1 omitted from encoding
-- Mode included when set
-- Group-by included
-
-**`tests/test_e2e.py`** (Phase 8): End-to-end integration tests (15 tests)
-- Full workflow: load → filter → aggregate → export consistency
-- Benchmark: institution comparison, treemap, rankings
-- PDF export validation
-- Chatbot: status, WebSocket session, save, scoped context
-- Rules: preset discovery, evaluate all, custom conditions, severity scores, workspace round-trip
-
-**`tests/test_performance.py`** (Phase 8): Performance benchmarks (14 tests)
-- Filter performance: 10k contracts < 200ms, 50k contracts < 500ms
-- Date range, category, combined, and text search filters
-- Aggregation, group-by, trend, rankings performance
-- Sort performance: single and multi-column
-- Load performance: 10k < 2s, 50k < 10s
+**Frontend (184+ passing, 25 test files):** One test file per component/page covering rendering, interactions, API mocking, URL-state, and accessibility.
 
 ### Data Flow
 
 ```
-CLI Args
-  ↓
-scrape_crz.py (entry point)
-  ↓
-scraper.scrape_contracts()
-  ├─ For each page:
-  │   ├─ fetch_page(listing_url)
-  │   ├─ extract_listing_rows(html)
-  │   └─ For each contract:
-  │       ├─ fetch_page(detail_url)
-  │       ├─ extract_contract_details(html)
-  │       ├─ For each PDF:
-  │       │   └─ download_and_extract_pdf()
-  │       ├─ Set category / pdf_text_summary / award_type defaults
-  │       └─ Write to NDJSON
-  └─ Return contract count
+CRZ / Josephine / UVO
+  ↓ (scrapers)
+scrape_crz.py / scrape_josephine.py / scrape_uvo.py
+  └─ Write NDJSON output
 
-         ↓ (optional: Phase 0 migration)
+         ↓
 
 scripts/migrate_ndjson.py
   Read NDJSON → backfill fields → write data/contracts.json
 
-         ↓ (Phase 1: load into engine)
+scripts/expand_subcontractors.py  (optional)
+  Explode subcontractors → data/contracts_subcontractors.json
 
-src/engine.py — DataStore
+         ↓
+
+src/engine.py — DataStore (primary)
+src/engine.py — DataStore (sub-store, optional)
   Load JSON → build indices → filter / group / aggregate / search / trend / rank
 
-         ↓ (Phase 2: REST API)
+         ↓
 
-src/api.py — FastAPI Application
-  DataStore loaded at startup → HTTP endpoints expose filter / aggregate / export
-  Frontend or curl → GET /api/contracts?institutions=X&page=1 → JSON response
+src/api.py — FastAPI Application (27 endpoints + WebSocket)
+  ├─ REST: GET /api/contracts, /api/aggregations, /api/treemap, etc.
+  ├─ Rules: POST /api/rules/evaluate, /api/rules/custom
+  ├─ Compare: GET /api/compare/aggregations (primary + sub-store)
+  └─ Chat: WS /api/chat → src/chatbot/* → LLM → streaming tokens
+
+         ↓
+
+frontend/ — React SPA
+  FilterContext → shared filter state across all 10 pages
+  api.ts → fetch wrappers (27 endpoints) + WebSocket URL
+  Pages: Dashboard / AllContracts / ContractDetail / ... / RedFlagsView
 ```
 
 ## Configuration
 
 ### Environment Variables
 
-Configured via `.env.example` (Phase 0) and loaded by `src/config.py` (Phase 2):
-- `LLM_PROVIDER`: Anthropic or OpenAI (for future chatbot)
-- `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`: API credentials
-- `GOVLENS_HOST` / `GOVLENS_PORT`: Server binding
-- `GOVLENS_DATA_PATH`: Path to contracts JSON
-- `SCRAPER_PDF_DIR`: PDF storage directory
-- `SCRAPER_DELAY`: Default delay between requests
+Configured via `src/config.py`, loaded through `python-dotenv`. Copy `.env.example` and fill in values:
+
+**Server & Data**
+- `GOVLENS_HOST` / `GOVLENS_PORT` — Server binding (default: `0.0.0.0:8000`)
+- `GOVLENS_DATA_PATH` — Path to main contracts JSON (default: `data/contracts.json`)
+- `GOVLENS_SUBCONTRACTORS_DATA_PATH` — Path to subcontractors JSON (optional, Phase 9)
+
+**LLM / Chatbot (Phase 5)**
+- `LLM_PROVIDER` — `openai` or `mock`; auto-forces `mock` when no API key set
+- `OPENAI_API_KEY` — OpenAI credentials
+- `OPENAI_MODEL` — Model identifier (default: `gpt-4.1-nano`)
+- `OPENAI_TEMPERATURE` — Sampling temperature (default: `0.2`)
+- `CHAT_STREAMING` — Stream tokens over WebSocket (default: `true`)
+- `CHAT_HISTORY_BACKEND` — `memory` (default), `redis`, or `postgres`
+- `CHAT_PROVENANCE` — Include contract citations in responses (default: `true`)
+- `CHAT_COST_TRACKING` — Track token cost per session (default: `false`)
+- `CHAT_OBSERVABILITY` — Enable observability/tracing hooks (default: `false`)
+- `CHAT_DEBUG` — Verbose chatbot logging (default: `false`)
+- `CHAT_MAX_MESSAGE_LENGTH` — Maximum user message length in chars (default: `4000`)
+
+**Scraper**
+- `SCRAPER_PDF_DIR` — PDF storage directory (default: `data/pdfs`)
+- `SCRAPER_DELAY` — Delay between requests in seconds (default: `0.5`)
 
 ### Constants in `scraper.py`
 
@@ -577,69 +641,66 @@ With `--delay 0.5`, this would be the dominant time.
 
 ## Testing
 
-### Unit Tests
-
-```bash
-pytest tests/test_parser.py tests/test_models.py tests/test_migrate.py -v
-```
-
-Tests cover:
-- Slovak price parsing
-- Slovak date parsing
-- ISO date parsing
-- Error cases
-- Contract model defaults and validation (Phase 0)
-- FilterState, AggregationResult, Institution, Vendor (Phase 0)
-- Sample data loading (Phase 0)
-- Migration field backfill and preservation (Phase 0)
-
-### Integration Tests
-
-```bash
-pytest tests/test_integration.py -v
-```
-
-Tests cover:
-- HTML parsing
-- Listing extraction
-- Detail extraction
-- PDF URL extraction
-- End-to-end scraping (mocked)
-
-### Running All Tests
+### Backend Tests (173+ tests across 18 files)
 
 ```bash
 pytest tests/ -v --tb=short
 ```
 
-### Test Coverage (Future)
+| Test file | Phase | Approx tests | What it covers |
+|-----------|-------|-------------|----------------|
+| `test_parser.py` | 0 | ~10 | Slovak price/date parsing |
+| `test_models.py` | 0 | ~12 | Contract, FilterState, AggregationResult, Institution, Vendor |
+| `test_migrate.py` | 0 | ~8 | NDJSON migration field backfill, preservation, edge cases |
+| `test_engine.py` | 1+6 | 95 | Filter, group-by, aggregate, trends, rankings, multi-column sort |
+| `test_api.py` | 2+6+7 | 46 | All 27 REST endpoints, filter combos, pagination, exports |
+| `test_workspace.py` | 7 | 5 | Save/load workspace round-trip, invalid tokens |
+| `test_export.py` | 7 | 5 | CSV/PDF export content, filters, sort |
+| `test_url_state.py` | 7 | 5 | URL-state encode/decode round-trip |
+| `test_e2e.py` | 8 | 15 | Full workflow, benchmark, chatbot WebSocket, rules round-trip |
+| `test_performance.py` | 8 | 14 | Filter/aggregation/sort/load performance benchmarks |
+| `test_integration.py` | 0 | ~8 | HTML parsing, listing/detail extraction, smoke test |
+| `test_rules.py` | 4 | 37 | All 6 preset rules, ConditionBuilder, severity scoring |
+| `test_chatbot.py` | 5 | 49 | MockLLM, streaming protocol frames, scope check, history, usage |
+| `test_compare.py` | 9 | ~10 | Compare aggregations, subcontractor store loading |
+| `test_expand_subcontractors.py` | 9 | ~8 | Subcontractor expansion logic, field remapping |
+| `test_josephine_scraper.py` | 9 | ~8 | Josephine portal scraping, PDF extraction |
+| `test_uvo_scraper.py` | 9 | ~8 | UVO portal scraping, shared helpers |
+| `test_data.json` | — | — | Seed test data (not a test runner file) |
+
+### Frontend Tests (184+ tests across 25 files)
 
 ```bash
+cd frontend && npm test
+# or watch mode
+npm run test:watch
+```
+
+All tests use **vitest** + `@testing-library/react`. Covers all 17 components and all 10 pages.
+
+### Targeted Runs
+
+```bash
+# Single file
+pytest tests/test_rules.py -v
+
+# By phase marker (if using pytest marks)
+pytest tests/ -k "chatbot" -v
+
+# Coverage report
 pytest --cov=src tests/
 ```
 
-## Future Enhancements
+## Potential Future Enhancements
 
-### High Priority
-
-1. **Resume capability**: Save progress, skip already-scraped contracts
-2. **Async fetching**: Use asyncio for parallel detail page fetches
-3. **Database output**: Option to store in SQLite instead of NDJSON
-4. **Filtering**: Only scrape contracts matching certain criteria
-
-### Medium Priority
-
-1. **OCR for scanned PDFs**: Add pytesseract support
-2. **Change detection**: Track and report only new/updated contracts
-3. **Configuration file**: YAML/JSON config instead of CLI args
-4. **Email alerts**: Notify on new contracts matching criteria
-
-### Low Priority
-
-1. **Web UI**: Simple Flask dashboard for browsing results
-2. **Caching**: Store HTML to reduce re-fetches
-3. **Analytics**: Statistics on contract distribution, trends
-4. **API endpoint**: REST API to query scraped data
+- **Async scraping**: `asyncio`/`httpx` parallel detail-page fetching for faster data collection
+- **OCR for scanned PDFs**: `pytesseract` + wand for image-only PDFs
+- **Redis/Postgres history**: Production-grade chatbot conversation history backends (stubs exist)
+- **Observability**: OpenTelemetry tracing hooks (config flag exists, handlers not implemented)
+- **Resume scraping**: Checkpoint to skip already-scraped contract IDs
+- **Change detection**: Diff scraper output over time to surface new/updated contracts
+- **More procurement portals**: Extend beyond CRZ, Josephine, UVO to other Slovak/EU portals
+- **Alert subscriptions**: Email/webhook notifications on rules matches above a severity threshold
 
 ## Troubleshooting
 
@@ -715,39 +776,58 @@ python scrape_crz.py --start-page 1 --max-pages 1 --log-level DEBUG
 
 ## Dependencies
 
-### Required
+### Backend (Python — `requirements.txt`)
 
-- `requests`: HTTP client with built-in retry
-- `beautifulsoup4`: HTML parsing
-- `lxml`: XML/HTML parser for BeautifulSoup
-- `pdfplumber`: PDF text extraction
-- `pydantic>=2.0`: Data models and validation (Phase 0)
-- `python-dotenv`: Environment configuration (Phase 0)
-- `fastapi`: REST API framework (Phase 2)
-- `uvicorn[standard]`: ASGI server for FastAPI (Phase 2)
-- `httpx`: HTTP client for FastAPI TestClient (Phase 2)
+**Core:**
+- `fastapi 0.135.1` — REST + WebSocket API framework
+- `uvicorn[standard] 0.41.0` — ASGI server
+- `pydantic 2.12.5` — Data models and validation
+- `python-dotenv` — `.env` file support
+- `httpx` — HTTP client (FastAPI TestClient)
+- `websockets 16.0` — WebSocket client/server support
 
-### Optional (Future)
+**Scraping & PDF:**
+- `requests` — HTTP client for scrapers
+- `beautifulsoup4` + `lxml` — HTML parsing
+- `pypdfium2` — PDF rendering/text extraction (Phase 9)
+- `pillow` — Image processing for PDF pages (Phase 9)
 
-- `pytesseract`: OCR for scanned PDFs
-- `Pillow` / `wand`: Image processing
-- `sqlite3`: Database (built-in)
-- `pandas`: Data analysis
-- `sqlalchemy`: ORM layer
+**AI / Chatbot:**
+- `openai` — OpenAI API client (Phase 5); auto-disabled when no key set
 
-### Frontend (Node.js / npm)
+**Export:**
+- `reportlab` — PDF report generation
 
-- `react` + `react-dom`: UI framework (Phase 3)
-- `react-router-dom`: Client-side routing (Phase 3)
-- `d3`: Treemap visualization (Phase 3)
-- `recharts`: Bar/line charts (Phase 3)
-- `tailwindcss` + `@tailwindcss/vite`: Utility CSS (Phase 3)
-- `vitest`: Test runner (Phase 3, dev)
-- `@testing-library/react` + `@testing-library/jest-dom`: Component testing (Phase 3, dev)
+### Frontend (Node.js — `frontend/package.json`)
+
+- `react 19.2` + `react-dom 19.2` — UI framework
+- `react-router-dom 7.13` — Client-side routing
+- `recharts 3.7` — Bar / line / area charts
+- `d3 7.9` — Treemap visualization
+- `tailwindcss v4` + `@tailwindcss/vite` — Utility-first CSS
+- `vite 7.3` — Build tool with HMR, dev proxy
+- `typescript ~5.9` — Type safety
+- `vitest 3.2.4` — Test runner
+- `@testing-library/react` + `@testing-library/jest-dom` — Component testing
+- `@testing-library/user-event` — User interaction simulation
 
 ## Version History
 
-### v1.9.0 — Phase 8: Polish, Integration Testing, and Deployment 
+### v2.0.0 — Phase 9: Compare View & Subcontractor Expansion
+
+- `scrape_josephine.py` — Josephine procurement portal scraper with OpenAI-assisted PDF extraction
+- `scrape_uvo.py` — UVO (Slovak Public Procurement Office) portal scraper
+- `scripts/expand_subcontractors.py` — explodes contract rows into one-per-subcontractor, remaps fields
+- `scripts/migrate_jose_parts_once.py` — one-time migration for Josephine parts data
+- Dual `DataStore` in `src/api.py`: primary (contracts) + sub-store (subcontractors), remaps `subcontractor`→`supplier`
+- New `CompareView` page — side-by-side contracts vs subcontractors aggregated by institution/vendor
+- `ClusteredBarChart` — grouped bar chart for compare view
+- `AccordionContracts` — collapsible contract list with inline summaries
+- New API endpoints: `/api/compare/aggregations`, `/api/categories`, `/api/filter-options`
+- New TypeScript types: `CompareAggregationRow`, `CompareAggregationsResponse`, `FilterOptionsResponse`
+- `pypdfium2` + `pillow` added to Python dependencies
+
+### v1.9.0 — Phase 8: Polish, Integration Testing, and Deployment
 
 - 15 E2E integration tests (`test_e2e.py`), 14 performance benchmarks (`test_performance.py`)
 - `ErrorBoundary.tsx` wrapping all routes with retry and error details
@@ -757,7 +837,44 @@ python scrape_crz.py --start-page 1 --max-pages 1 --log-level DEBUG
 - Makefile + start_dev.sh + start_dev.ps1 dev scripts
 - GitHub Actions CI pipeline (4 jobs: backend-tests, frontend-tests, lint, build)
 
-### v1.4.0 — Phase 3: Frontend: Institution Lens UI 
+### v1.8.0 — Phase 7: Workspace Persistence & Export
+
+- `WorkspaceToolbar` component — Share (clipboard), Save Workspace (JSON), Export CSV, Export PDF
+- `/api/workspace/save` + `/api/workspace/load` — base64-encoded snapshot tokens
+- `/api/export/csv` + `/api/export/pdf` — filtered downloads; PDF uses ReportLab
+- `url-state.ts` extended with `mode` field; filter encoding/decoding round-trips
+- 15 new tests: `test_workspace.py`, `test_export.py`, `test_url_state.py`
+
+### v1.7.0 — Phase 6: Investigation Modes
+
+- BenchmarkView, TimeView, RankingsView pages
+- Multi-metric compare: `/api/benchmark/compare`, `/api/benchmark/peers`
+- Enhanced trends: `/api/trends` with multi-metric overlays
+- Enhanced rankings with `vendor_concentration` and `fragmentation_score` metrics
+- `LeaderboardTable`, `TrendChart`, `MetricSelector` components
+- `FilterContext.tsx` — global filter state shared across all pages from `/api/filter-options`
+
+### v1.6.0 — Phase 5: LLM Chatbot
+
+- `src/chatbot/` package: `llm.py`, `protocol.py`, `context.py`, `scope.py`, `history.py`, `usage.py`
+- WebSocket endpoint `ws://.../api/chat` with streaming token frames
+- `MockLLMClient` (default) + `OpenAIClient` (activated by env)
+- Scoped context builder with LRU cache; `ScopeRefusal` for out-of-scope queries
+- `InMemoryHistory` with LRU-256 session cap; Redis/Postgres stubs behind feature flags
+- Per-session cost tracking when `CHAT_COST_TRACKING=true`
+- `ChatBar` component on Dashboard; `/api/chat/status`, `/api/chat/save`
+- 49 new tests in `test_chatbot.py`
+
+### v1.5.0 — Phase 4: Red-Flags Rules Engine
+
+- `src/rules/` package: `engine.py`, `builder.py`
+- 6 preset rules: `threshold_proximity`, `vendor_concentration`, `fragmentation`, `overnight_turnaround`, `new_vendor_large`, `round_number_clustering`
+- `ConditionBuilder` — no-code custom rules with AND/OR logic, JSON-serialisable
+- API endpoints: `/api/rules/presets`, `/api/rules/evaluate`, `/api/rules/custom`
+- `RedFlagsView` page + `RulePanel` component
+- 37 new tests in `test_rules.py`
+
+### v1.4.0 — Phase 3: Frontend: Institution Lens UI
 
 - React 18 + TypeScript + Vite frontend in `frontend/`
 - Tailwind CSS v4 via `@tailwindcss/vite` plugin
