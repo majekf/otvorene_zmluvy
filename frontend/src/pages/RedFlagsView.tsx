@@ -1,5 +1,5 @@
 /**
- * Rule Builder Page
+ * Red Flags Page
  *
  * Dedicated page for pattern detection: FilterBar on top (shared via
  * FilterContext), then RulePanel (preset rules) and ConditionBuilder
@@ -12,7 +12,7 @@ import FilterBar from '../components/FilterBar';
 import RulePanel from '../components/RulePanel';
 import ConditionBuilder from '../components/ConditionBuilder';
 
-export default function RuleBuilderView() {
+export default function RedFlagsView() {
   const {
     filters,
     setFilters,
@@ -40,7 +40,7 @@ export default function RuleBuilderView() {
   );
 
   return (
-    <div data-testid="rule-builder-view" className="space-y-8 animate-fade-in">
+    <div data-testid="red-flags-view" className="space-y-8 animate-fade-in">
       {/* Filters */}
       <FilterBar
         filters={filters}

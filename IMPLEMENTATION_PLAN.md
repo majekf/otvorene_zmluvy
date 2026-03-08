@@ -182,7 +182,7 @@ Full suite: 173 tests (80 Phase 1 + 33 Phase 2 + 60 Phase 0 + prior) — all pas
 #### Unlocks
 
 - Phase 2 (API) can expose these operations as HTTP endpoints. ✅ DONE
-- Phase 4 (Rule Builder) reuses filter + aggregation primitives.
+- Phase 4 (Red Flags) reuses filter + aggregation primitives.
 
 ---
 
@@ -326,7 +326,7 @@ Full suite: 161 tests (42 Phase 2 + 80 Phase 1 + 39 Phase 0) — all passing.
 
 ---
 
-### Phase 4 — Rule Builder (Pattern Engine)
+### Phase 4 — Red Flags (Pattern Engine)
 
 **Goal:** Build the journalist-driven pattern detection engine: preset rules with customizable parameters, a no-code condition builder, and per-contract/per-vendor badge rendering.
 
@@ -353,7 +353,7 @@ Full suite: 161 tests (42 Phase 2 + 80 Phase 1 + 39 Phase 0) — all passing.
 | 4.13 | Frontend: `ConditionBuilder` component — no-code field/operator/value rows, add/remove, AND/OR toggle | ✅ DONE |
 | 4.14 | Frontend: `RuleBadge` component — small badge on contract/vendor rows explaining which rules fired | ✅ DONE |
 | 4.15 | Frontend: `SeverityIndicator` component — visual severity score (color-coded) on contract rows | ✅ DONE |
-| 4.16 | Frontend: Extract Rule Builder into dedicated `RuleBuilderView` page (`/rules`) — `FilterBar` on top (shared via `FilterContext`), `RulePanel` + `ConditionBuilder` side by side; rule builder removed from `Dashboard.tsx`; nav link "Rule Builder" added to top bar; route `/rules` added to `App.tsx` | ✅ DONE |
+| 4.16 | Frontend: Extract Red Flags into dedicated `RedFlagsView` page (`/red-flags`) — `FilterBar` on top (shared via `FilterContext`), `RulePanel` + `ConditionBuilder` side by side; removed from `Dashboard.tsx`; nav link "Red Flags" added to top bar; route `/red-flags` added to `App.tsx` | ✅ DONE |
 
 #### Unit Tests for Phase 4 — ✅ All 63 tests passing (37 backend + 26 frontend)
 
@@ -371,7 +371,7 @@ Full suite: 161 tests (42 Phase 2 + 80 Phase 1 + 39 Phase 0) — all passing.
 | `test_rules.py::TestRulesAPI` (6 tests) | GET /api/rules/presets, POST /api/rules/evaluate, POST /api/rules/custom, error handling | ✅ PASS |
 | `RulePanel.test.tsx` (6 tests) | Renders presets, slider changes params, evaluate calls API, displays flags, loading state, error state | ✅ PASS |
 | `ConditionBuilder.test.tsx` (8 tests) | Add/remove rows, AND/OR toggle, field/operator/value selection, evaluate calls API, serialization, empty state, result display | ✅ PASS |
-| `RuleBuilderView.test.tsx` (12 tests) | Page container, filter bar, rule panel & condition builder rendering, no toggle button, no dashboard elements (summary strip, charts), preset loading, preset display, add-condition & evaluate buttons | ✅ PASS |
+| `RedFlagsView.test.tsx` (12 tests) | Page container, filter bar, rule panel & condition builder rendering, no toggle button, no dashboard elements (summary strip, charts), preset loading, preset display, add-condition & evaluate buttons | ✅ PASS |
 
 #### Unlocks
 
@@ -733,9 +733,9 @@ Phase 0: Foundation (Schema, Data Model, Restructure)
    │       │       │
    │       │       ├──► Phase 5: Contextual Chatbot
    │       │       │
-   │       │       └──► Phase 4: Rule Builder
+   │       │       └──► Phase 4: Red Flags
    │       │
-   │       └──► Phase 4: Rule Builder (backend part)
+   │       └──► Phase 4: Red Flags (backend part)
    │
    └──► All phases depend on Phase 0
 
@@ -751,7 +751,7 @@ Phase 9: Compare (Contracts vs Subcontractors) ← depends on Phase 2, 3, 6
 | 2nd | **Phase 1** — Query Engine | 2–3 days | ✅ **COMPLETE** | Core logic; must be solid before API |
 | 3rd | **Phase 2** — Backend API | 2–3 days | ✅ **COMPLETE** | Exposes engine to frontend; enables parallel frontend work |
 | 4th | **Phase 3** — Institution Lens UI | 4–5 days | ✅ **COMPLETE** | Primary user-facing view; largest frontend effort |
-| 5th | **Phase 4** — Rule Builder | 3–4 days | ✅ **COMPLETE** | High-value investigative feature; backend + frontend |
+| 5th | **Phase 4** — Red Flags | 3–4 days | ✅ **COMPLETE** | High-value investigative feature; backend + frontend |
 | 6th | **Phase 5** — Chatbot | 4–6 days | ✅ **COMPLETE** | All LLM features optional; `MockLLMClient` default; 49 backend passed + 2 skipped (require `OPENAI_API_KEY` / Redis) + 15 frontend tests |
 | 7th | **Phase 6** — Investigation Modes | 3–4 days | ✅ **COMPLETE** | Extends existing UI infrastructure |
 | 8th | **Phase 7** — State & Export | 2–3 days | ✅ **COMPLETE** | Polishes the experience; depends on stable views |

@@ -34,8 +34,8 @@ vi.mock('../pages/AllContracts', () => ({
 vi.mock('../pages/CompareView', () => ({
   default: () => <div data-testid="compare-view-page">CompareView</div>,
 }));
-vi.mock('../pages/RuleBuilderView', () => ({
-  default: () => <div data-testid="rule-builder-view-page">RuleBuilderView</div>,
+vi.mock('../pages/RedFlagsView', () => ({
+  default: () => <div data-testid="red-flags-view-page">RedFlagsView</div>,
 }));
 
 function renderApp(route: string) {
@@ -92,9 +92,9 @@ describe('App routing', () => {
     expect(screen.getByTestId('all-contracts-page')).toBeInTheDocument();
   });
 
-  it('routes /rules to RuleBuilderView', () => {
-    renderApp('/rules');
-    expect(screen.getByTestId('rule-builder-view-page')).toBeInTheDocument();
+  it('routes /red-flags to RedFlagsView', () => {
+    renderApp('/red-flags');
+    expect(screen.getByTestId('red-flags-view-page')).toBeInTheDocument();
   });
 
   it('renders navigation links', () => {
@@ -106,7 +106,7 @@ describe('App routing', () => {
     expect(within(nav).getByText('Benchmark')).toBeInTheDocument();
     expect(within(nav).getByText('Trends')).toBeInTheDocument();
     expect(within(nav).getByText('Rankings')).toBeInTheDocument();
-    expect(within(nav).getByText('Rule Builder')).toBeInTheDocument();
+    expect(within(nav).getByText('Red Flags')).toBeInTheDocument();
   });
 
   it('renders footer', () => {

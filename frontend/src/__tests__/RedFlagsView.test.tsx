@@ -1,5 +1,5 @@
 /**
- * Tests for RuleBuilderView page
+ * Tests for RedFlagsView page
  *
  * Covers: rendering, filter bar integration, RulePanel and ConditionBuilder
  * panels, loading states, and absence of dashboard-specific elements.
@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import RuleBuilderView from '../pages/RuleBuilderView';
+import RedFlagsView from '../pages/RedFlagsView';
 import { FilterProvider } from '../FilterContext';
 import * as api from '../api';
 
@@ -30,19 +30,19 @@ const mockPresets = {
   ],
 };
 
-function renderPage(route = '/rules') {
+function renderPage(route = '/red-flags') {
   return render(
     <MemoryRouter initialEntries={[route]}>
       <FilterProvider>
         <Routes>
-          <Route path="/rules" element={<RuleBuilderView />} />
+          <Route path="/red-flags" element={<RedFlagsView />} />
         </Routes>
       </FilterProvider>
     </MemoryRouter>,
   );
 }
 
-describe('RuleBuilderView', () => {
+describe('RedFlagsView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(api.fetchRulePresets).mockResolvedValue(mockPresets);
@@ -67,7 +67,7 @@ describe('RuleBuilderView', () => {
 
   it('renders the page container', () => {
     renderPage();
-    expect(screen.getByTestId('rule-builder-view')).toBeInTheDocument();
+    expect(screen.getByTestId('red-flags-view')).toBeInTheDocument();
   });
 
   it('renders the filter bar', () => {
