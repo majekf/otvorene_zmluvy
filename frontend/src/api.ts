@@ -181,8 +181,10 @@ export async function fetchRankings(
   entity: 'institutions' | 'vendors' = 'institutions',
   metric = 'total_spend',
   filters: FilterState = {},
+  page = 1,
+  pageSize = 20,
 ): Promise<RankingsResponse> {
-  const p = { ...filterParams(filters), entity, metric };
+  const p = { ...filterParams(filters), entity, metric, page: String(page), page_size: String(pageSize) };
   return get<RankingsResponse>(`/api/rankings${qs(p)}`);
 }
 

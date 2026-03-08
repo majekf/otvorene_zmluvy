@@ -354,6 +354,68 @@ class TestRankings:
         assert data["rankings"][0]["vendor"] == "STRABAG s.r.o."
 
 
+class TestRankingsPagination:
+    """Tests for pagination support on /api/rankings endpoint."""
+
+    def test_rankings_response_has_pagination_metadata(self, client):
+        """Response includes total, page, page_size, total_pages fields."""
+        r = client.get("/api/rankings", params={"entity": "institutions"})
+        assert r.status_code == 200
+        data = r.json()
+        assert "total" in data
+        assert "page" in data
+        assert "page_size" in data
+        assert "total_pages" in data
+        assert data["page"] == 1
+        assert data["page_size"] == 20
+
+    def test_rankings_pagination_limits_results(self, client):
+        """page_size=2 returns only 2 records on page 1."""
+        r = client.get(
+            "/api/rankings",
+            params={"entity": "institutions", "metric": "total_spend", "page_size": 2},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert len(data["rankings"]) == 2
+        assert data["total"] == 3  # 3 institutions in test fixture
+        assert data["page_size"] == 2
+        assert data["total_pages"] == 2
+        # First page still returns rank 1
+        assert data["rankings"][0]["rank"] == 1
+
+    def test_rankings_pagination_page_2(self, client):
+        """page=2 with page_size=2 returns the 3rd institution."""
+        r = client.get(
+            "/api/rankings",
+            params={"entity": "institutions", "metric": "total_spend", "page_size": 2, "page": 2},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert len(data["rankings"]) == 1
+        assert data["page"] == 2
+        # Rank numbers are global (rank 3 is on page 2)
+        assert data["rankings"][0]["rank"] == 3
+
+    def test_rankings_pagination_beyond_last_page_returns_empty(self, client):
+        """Requesting a page beyond the last returns empty rankings."""
+        r = client.get(
+            "/api/rankings",
+            params={"entity": "institutions", "page": 99, "page_size": 20},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data["rankings"] == []
+        assert data["total"] == 3
+
+    def test_rankings_default_page_size_is_20(self, client):
+        """Default page_size is 20 — all 3 test-fixture institutions fit on page 1."""
+        r = client.get("/api/rankings", params={"entity": "institutions"})
+        data = r.json()
+        assert data["page_size"] == 20
+        assert len(data["rankings"]) == 3  # all 3 fit
+
+
 # ── Institutions ─────────────────────────────────────────────────────
 
 
