@@ -56,32 +56,28 @@ function renderTable(
 
 describe('ContractsTable – Column order and consistency', () => {
   const EXPECTED_ORDER = [
-    'contract_title',
     'scanned_suggested_title',
     'supplier',
     'buyer',
     'price_numeric_eur',
     'published_date',
-    'scanned_service_type',
     'scanned_service_subtype',
   ];
 
   const EXPECTED_LABELS = [
-    'Title',
     'Subject',
     'Vendor',
     'Institution',
     'Value',
     'Date',
-    'Type',
     'Subtype',
   ];
 
-  it('TABLE_COLUMNS has exactly 8 columns', () => {
-    expect(TABLE_COLUMNS).toHaveLength(8);
+  it('TABLE_COLUMNS has exactly 6 columns', () => {
+    expect(TABLE_COLUMNS).toHaveLength(6);
   });
 
-  it('TABLE_COLUMNS keys follow the required order: Title, Subject, Vendor, Institution, Value, Date, Type, Subtype', () => {
+  it('TABLE_COLUMNS keys follow the required order: Subject, Vendor, Institution, Value, Date, Subtype', () => {
     const keys = TABLE_COLUMNS.map((col) => col.key);
     expect(keys).toEqual(EXPECTED_ORDER);
   });
@@ -91,14 +87,14 @@ describe('ContractsTable – Column order and consistency', () => {
     expect(labels).toEqual(EXPECTED_LABELS);
   });
 
-  it('default variant renders all 8 column headers in correct order', () => {
+  it('default variant renders all 6 column headers in correct order', () => {
     renderTable([makeContract()]);
     const headers = screen.getAllByRole('columnheader');
     const headerKeys = headers.map((h) => h.getAttribute('data-testid')?.replace('th-', ''));
     expect(headerKeys).toEqual(EXPECTED_ORDER);
   });
 
-  it('all-contracts variant renders the same 8 column headers in the same order', () => {
+  it('all-contracts variant renders the same 6 column headers in the same order', () => {
     renderTable([makeContract()], [], vi.fn(), 'all-contracts');
     const headers = screen.getAllByRole('columnheader');
     const headerKeys = headers.map((h) => h.getAttribute('data-testid')?.replace('th-', ''));
@@ -120,23 +116,38 @@ describe('ContractsTable – Column order and consistency', () => {
     expect(screen.queryByTestId('th-award_type')).not.toBeInTheDocument();
   });
 
-  it('includes Subject, Type, and Subtype columns in default variant', () => {
+  it('does not include a Title column', () => {
+    renderTable([makeContract()]);
+    expect(screen.queryByTestId('th-contract_title')).not.toBeInTheDocument();
+  });
+
+  it('does not include a Type column', () => {
+    renderTable([makeContract()]);
+    expect(screen.queryByTestId('th-scanned_service_type')).not.toBeInTheDocument();
+  });
+
+  it('includes Subject and Subtype columns in default variant', () => {
     renderTable([makeContract()]);
     expect(screen.getByTestId('th-scanned_suggested_title')).toBeInTheDocument();
-    expect(screen.getByTestId('th-scanned_service_type')).toBeInTheDocument();
     expect(screen.getByTestId('th-scanned_service_subtype')).toBeInTheDocument();
+  });
+
+  it('Subject column links to contract detail page', () => {
+    renderTable([makeContract({ contract_id: 'c1', scanned_suggested_title: 'Managed services' })]);
+    const subjectLink = screen.getByRole('link', { name: 'Managed services' });
+    expect(subjectLink).toHaveAttribute('href', '/contract/c1');
   });
 });
 
 describe('ContractsTable – Column width configuration', () => {
-  it('Title column has a narrower width class (w-[14%])', () => {
-    const titleCol = TABLE_COLUMNS.find((col) => col.key === 'contract_title');
-    expect(titleCol?.className).toContain('w-[14%]');
+  it('Subject column has a wider width class (w-[24%])', () => {
+    const subjectCol = TABLE_COLUMNS.find((col) => col.key === 'scanned_suggested_title');
+    expect(subjectCol?.className).toContain('w-[24%]');
   });
 
-  it('Title column max-width is 180px (narrower than before)', () => {
-    const titleCol = TABLE_COLUMNS.find((col) => col.key === 'contract_title');
-    expect(titleCol?.className).toContain('max-w-[180px]');
+  it('Subject column max-width is 300px', () => {
+    const subjectCol = TABLE_COLUMNS.find((col) => col.key === 'scanned_suggested_title');
+    expect(subjectCol?.className).toContain('max-w-[300px]');
   });
 
   it('all columns have explicit width classes', () => {
@@ -147,7 +158,7 @@ describe('ContractsTable – Column width configuration', () => {
   });
 
   it('all text-heavy columns have truncate class for overflow', () => {
-    const textCols = ['contract_title', 'scanned_suggested_title', 'supplier', 'buyer', 'scanned_service_type', 'scanned_service_subtype'];
+    const textCols = ['scanned_suggested_title', 'supplier', 'buyer', 'scanned_service_subtype'];
     for (const key of textCols) {
       const col = TABLE_COLUMNS.find((c) => c.key === key);
       expect(col?.className).toContain('truncate');

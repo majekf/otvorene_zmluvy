@@ -152,34 +152,41 @@ describe('AllContracts', () => {
     });
   });
 
-  it('displays contract rows', async () => {
+  it('displays contract rows via Subject column', async () => {
     renderPage();
     await waitFor(() => {
-      expect(screen.getByText('Road Construction A')).toBeInTheDocument();
-      expect(screen.getByText('IT Services B')).toBeInTheDocument();
+      expect(screen.getByText('Road resurfacing and repair')).toBeInTheDocument();
+      expect(screen.getByText('Managed IT support')).toBeInTheDocument();
     });
   });
 
-  it('uses All Contracts table columns: Subject, Type, Subtype, without Award', async () => {
+  it('uses All Contracts table columns: Subject, Subtype, without Title, Type, or Award', async () => {
     renderPage();
     await waitFor(() => {
       expect(screen.getByTestId('th-scanned_suggested_title')).toHaveTextContent('Subject');
-      expect(screen.getByTestId('th-scanned_service_type')).toHaveTextContent('Type');
       expect(screen.getByTestId('th-scanned_service_subtype')).toHaveTextContent('Subtype');
+      expect(screen.queryByTestId('th-contract_title')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('th-scanned_service_type')).not.toBeInTheDocument();
       expect(screen.queryByTestId('th-category')).not.toBeInTheDocument();
       expect(screen.queryByTestId('th-award_type')).not.toBeInTheDocument();
     });
   });
 
-  it('renders Subject, Type, and Subtype values from scanned fields', async () => {
+  it('renders Subject and Subtype values from scanned fields', async () => {
     renderPage();
     await waitFor(() => {
       expect(screen.getByText('Road resurfacing and repair')).toBeInTheDocument();
-      expect(screen.getByText('construction_services')).toBeInTheDocument();
       expect(screen.getByText('road_maintenance')).toBeInTheDocument();
       expect(screen.getByText('Managed IT support')).toBeInTheDocument();
-      expect(screen.getByText('it_services')).toBeInTheDocument();
       expect(screen.getByText('helpdesk')).toBeInTheDocument();
+    });
+  });
+
+  it('Subject column links to contract detail page', async () => {
+    renderPage();
+    await waitFor(() => {
+      const subjectLink = screen.getByRole('link', { name: 'Road resurfacing and repair' });
+      expect(subjectLink).toHaveAttribute('href', '/contract/c1');
     });
   });
 
