@@ -64,6 +64,19 @@ export default function Dashboard() {
 
   const [error, setError] = useState<string | null>(null);
 
+  // When groupBy is "category" and exactly one category is selected,
+  // drill into service subtypes for the treemap and accordion.
+  // Note: the "Category" grouping maps to scanned_service_types in the filter model.
+  const effectiveGroupBy = useMemo<string>(() => {
+    if (
+      groupBy === 'category' &&
+      filters.scanned_service_types?.length === 1
+    ) {
+      return 'scanned_service_subtype';
+    }
+    return groupBy;
+  }, [groupBy, filters.scanned_service_types]);
+
   // Sync state → URL
   useEffect(() => {
     const params = encodeUrlState({ filters, sort, groupBy, page, pageSize, mode: 'dashboard' });
@@ -76,8 +89,8 @@ export default function Dashboard() {
     setLoading(true);
 
     Promise.all([
-      fetchAggregations(filters, groupBy),
-      fetchTreemap(filters, groupBy),
+      fetchAggregations(filters, effectiveGroupBy as GroupByField),
+      fetchTreemap(filters, effectiveGroupBy as GroupByField),
     ])
       .then(([aggRes, treemapRes]) => {
         if (cancelled) return;
@@ -95,7 +108,7 @@ export default function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [filters, groupBy]);
+  }, [filters, effectiveGroupBy]);
 
   const handleFilterChange = useCallback((newFilters: typeof filters) => {
     setFilters(newFilters);
@@ -103,6 +116,13 @@ export default function Dashboard() {
 
   const applyGroupFilter = useCallback((groupValue: string) => {
     if (!groupValue) return;
+    if (effectiveGroupBy === 'scanned_service_subtype') {
+      setFilters({
+        ...filters,
+        scanned_service_subtypes: [groupValue],
+      });
+      return;
+    }
     if (groupBy === 'buyer') {
       setFilters({ ...filters, institutions: [groupValue], institution_icos: undefined });
       return;
@@ -132,7 +152,7 @@ export default function Dashboard() {
         date_to: `${groupValue}-${String(endDay).padStart(2, '0')}`,
       });
     }
-  }, [filters, groupBy, setFilters]);
+  }, [filters, groupBy, effectiveGroupBy, setFilters]);
 
   return (
     <div data-testid="dashboard" className="space-y-8 animate-fade-in">
@@ -222,7 +242,7 @@ export default function Dashboard() {
           renderExpanded={(groupValue) => (
             <AccordionContracts
               filters={filters}
-              groupBy={groupBy}
+              groupBy={effectiveGroupBy as GroupByField}
               groupValue={groupValue}
             />
           )}
