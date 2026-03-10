@@ -22,7 +22,7 @@ interface AccordionContractsProps {
   /** Parent page's active filters. */
   filters: FilterState;
   /** Which field the aggregation is grouped by. */
-  groupBy: GroupByField;
+  groupBy: GroupByField | string;
   /** The specific group value to filter on (e.g. "construction"). */
   groupValue: string;
 }
@@ -33,7 +33,7 @@ interface AccordionContractsProps {
  */
 function mergeGroupFilter(
   base: FilterState,
-  groupBy: GroupByField,
+  groupBy: GroupByField | string,
   value: string,
 ): FilterState {
   const merged = { ...base };
@@ -41,6 +41,9 @@ function mergeGroupFilter(
     case 'category':
       merged.scanned_service_types = [value];
       merged.scanned_service_subtypes = undefined;
+      break;
+    case 'scanned_service_subtype':
+      merged.scanned_service_subtypes = [value];
       break;
     case 'supplier':
       merged.vendors = [value];

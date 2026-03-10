@@ -226,6 +226,18 @@ describe('AccordionContracts', () => {
     });
   });
 
+  it('calls fetchContracts with subtype filter for groupBy=scanned_service_subtype', async () => {
+    renderComponent({ groupBy: 'scanned_service_subtype' as any, groupValue: 'helpdesk' });
+    await waitFor(() => {
+      expect(api.fetchContracts).toHaveBeenCalledWith(
+        expect.objectContaining({ scanned_service_subtypes: ['helpdesk'] }),
+        1,
+        10,
+        [],
+      );
+    });
+  });
+
   it('calls fetchContracts with date range for groupBy=month', async () => {
     renderComponent({ groupBy: 'month', groupValue: '2024-02' });
     await waitFor(() => {
@@ -286,6 +298,11 @@ describe('mergeGroupFilter', () => {
   it('adds scanned_service_types for groupBy=category', () => {
     const result = mergeGroupFilter({}, 'category', 'construction');
     expect(result.scanned_service_types).toEqual(['construction']);
+  });
+
+  it('adds scanned_service_subtypes for groupBy=scanned_service_subtype', () => {
+    const result = mergeGroupFilter({}, 'scanned_service_subtype', 'helpdesk');
+    expect(result.scanned_service_subtypes).toEqual(['helpdesk']);
   });
 
   it('adds vendors for groupBy=supplier', () => {

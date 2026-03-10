@@ -21,7 +21,7 @@ interface ContractsTableProps {
   variant?: 'default' | 'all-contracts';
 }
 
-interface ColumnDef {
+export interface ColumnDef {
   key: string;
   label: string;
   sortable: boolean;
@@ -29,20 +29,20 @@ interface ColumnDef {
   className?: string;
 }
 
-const DEFAULT_COLUMNS: ColumnDef[] = [
+export const TABLE_COLUMNS: ColumnDef[] = [
   {
-    key: 'contract_title',
-    label: 'Title',
+    key: 'scanned_suggested_title',
+    label: 'Subject',
     sortable: true,
-    className: 'max-w-[300px] truncate',
+    className: 'w-[24%] max-w-[300px] truncate',
     render: (c) => (
       <Link
         to={`/contract/${c.contract_id}`}
         className="text-primary-600 hover:text-primary-800 font-medium transition-colors"
-        title={c.contract_title || ''}
+        title={c.scanned_suggested_title || c.contract_title || ''}
         onClick={(e) => e.stopPropagation()}
       >
-        {c.contract_title || '—'}
+        {c.scanned_suggested_title || c.contract_title || '—'}
       </Link>
     ),
   },
@@ -50,6 +50,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
     key: 'supplier',
     label: 'Vendor',
     sortable: true,
+    className: 'w-[18%] truncate',
     render: (c) =>
       c.supplier ? (
         <Link
@@ -67,6 +68,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
     key: 'buyer',
     label: 'Institution',
     sortable: true,
+    className: 'w-[18%] truncate',
     render: (c) =>
       c.buyer ? (
         <Link
@@ -84,57 +86,22 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
     key: 'price_numeric_eur',
     label: 'Value',
     sortable: true,
-    className: 'text-right',
+    className: 'w-[14%] text-right',
     render: (c) => <span className="font-mono">{formatEur(c.price_numeric_eur)}</span>,
   },
   {
     key: 'published_date',
     label: 'Date',
     sortable: true,
+    className: 'w-[12%]',
     render: (c) => formatDate(c.published_date),
-  },
-  {
-    key: 'award_type',
-    label: 'Award',
-    sortable: true,
-    render: (c) => (
-      <span
-        className={`chip ${
-          c.award_type === 'direct_award'
-            ? 'chip-red'
-            : c.award_type === 'open_tender'
-              ? 'chip-green'
-              : 'chip-gray'
-        }`}
-      >
-        {c.award_type === 'direct_award' && <span className="badge-dot bg-red-500" />}
-        {c.award_type === 'open_tender' && <span className="badge-dot bg-green-500" />}
-        {c.award_type}
-      </span>
-    ),
-  },
-];
-
-const ALL_CONTRACTS_COLUMNS: ColumnDef[] = [
-  ...DEFAULT_COLUMNS.slice(0, 5),
-  {
-    key: 'scanned_suggested_title',
-    label: 'Subject',
-    sortable: true,
-    className: 'max-w-[260px] truncate',
-    render: (c) => c.scanned_suggested_title || 'â€”',
-  },
-  {
-    key: 'scanned_service_type',
-    label: 'Type',
-    sortable: true,
-    render: (c) => c.scanned_service_type || 'â€”',
   },
   {
     key: 'scanned_service_subtype',
     label: 'Subtype',
     sortable: true,
-    render: (c) => c.scanned_service_subtype || 'â€”',
+    className: 'w-[14%] truncate',
+    render: (c) => c.scanned_service_subtype || '—',
   },
 ];
 
@@ -149,7 +116,7 @@ function directionArrow(dir: string): string {
 const PRIORITY_BADGES = ['①', '②', '③'];
 
 export default function ContractsTable({ contracts, sort, onSortChange, onRowClick, contractSeverities, variant = 'default' }: ContractsTableProps) {
-  const columns = variant === 'all-contracts' ? ALL_CONTRACTS_COLUMNS : DEFAULT_COLUMNS;
+  const columns = TABLE_COLUMNS;
 
   const handleHeaderClick = useCallback(
     (field: string, e: React.MouseEvent | React.KeyboardEvent) => {

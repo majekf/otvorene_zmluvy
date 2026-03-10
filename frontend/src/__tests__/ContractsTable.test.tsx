@@ -29,6 +29,7 @@ const makeContract = (overrides: Partial<Contract> = {}): Contract => ({
   pdf_url: null,
   pdf_text: null,
   scraped_at: null,
+  scanned_suggested_title: 'Managed services',
   ...overrides,
 });
 
@@ -61,7 +62,7 @@ describe('ContractsTable', () => {
 
   it('renders contracts in a table', () => {
     renderTable([makeContract()]);
-    expect(screen.getByText('Test Contract')).toBeInTheDocument();
+    expect(screen.getByText('Managed services')).toBeInTheDocument();
     expect(screen.getByText('Vendor X')).toBeInTheDocument();
     expect(screen.getByText('Institution A')).toBeInTheDocument();
   });
@@ -71,26 +72,36 @@ describe('ContractsTable', () => {
     expect(screen.queryByTestId('th-category')).not.toBeInTheDocument();
   });
 
+  it('does not render Title column', () => {
+    renderTable([makeContract()]);
+    expect(screen.queryByTestId('th-contract_title')).not.toBeInTheDocument();
+  });
+
+  it('does not render Type column', () => {
+    renderTable([makeContract()]);
+    expect(screen.queryByTestId('th-scanned_service_type')).not.toBeInTheDocument();
+  });
+
   it('calls onSortChange on header click', () => {
     const onSortChange = vi.fn();
     renderTable([makeContract()], [], onSortChange);
-    fireEvent.click(screen.getByTestId('th-contract_title'));
-    expect(onSortChange).toHaveBeenCalledWith([['contract_title', 'asc']]);
+    fireEvent.click(screen.getByTestId('th-scanned_suggested_title'));
+    expect(onSortChange).toHaveBeenCalledWith([['scanned_suggested_title', 'asc']]);
   });
 
   it('toggles sort direction when clicking same column', () => {
     const onSortChange = vi.fn();
-    renderTable([makeContract()], [['contract_title', 'asc']], onSortChange);
-    fireEvent.click(screen.getByTestId('th-contract_title'));
-    expect(onSortChange).toHaveBeenCalledWith([['contract_title', 'desc']]);
+    renderTable([makeContract()], [['scanned_suggested_title', 'asc']], onSortChange);
+    fireEvent.click(screen.getByTestId('th-scanned_suggested_title'));
+    expect(onSortChange).toHaveBeenCalledWith([['scanned_suggested_title', 'desc']]);
   });
 
   it('appends secondary sort on shift+click', () => {
     const onSortChange = vi.fn();
-    renderTable([makeContract()], [['contract_title', 'asc']], onSortChange);
+    renderTable([makeContract()], [['scanned_suggested_title', 'asc']], onSortChange);
     fireEvent.click(screen.getByTestId('th-price_numeric_eur'), { shiftKey: true });
     expect(onSortChange).toHaveBeenCalledWith([
-      ['contract_title', 'asc'],
+      ['scanned_suggested_title', 'asc'],
       ['price_numeric_eur', 'asc'],
     ]);
   });
@@ -138,11 +149,11 @@ describe('ContractsTable', () => {
     expect(onRowClick).not.toHaveBeenCalled();
   });
 
-  it('clicking title link does not trigger row navigation (prevents double history push)', () => {
+  it('clicking subject link does not trigger row navigation (prevents double history push)', () => {
     const onRowClick = vi.fn();
-    renderTable([makeContract({ contract_id: 'c1', contract_title: 'Test Contract' })], [], vi.fn(), onRowClick);
-    const titleLink = screen.getByRole('link', { name: 'Test Contract' });
-    fireEvent.click(titleLink);
+    renderTable([makeContract({ contract_id: 'c1', scanned_suggested_title: 'Managed services' })], [], vi.fn(), onRowClick);
+    const subjectLink = screen.getByRole('link', { name: 'Managed services' });
+    fireEvent.click(subjectLink);
     expect(onRowClick).not.toHaveBeenCalled();
   });
 
@@ -158,19 +169,24 @@ describe('ContractsTable', () => {
     expect(institutionLink).toHaveAttribute('href', '/institution/Institution%20A');
   });
 
-  it('title link points to contract detail page', () => {
-    renderTable([makeContract({ contract_id: 'c1', contract_title: 'Test Contract' })]);
-    const titleLink = screen.getByRole('link', { name: 'Test Contract' });
-    expect(titleLink).toHaveAttribute('href', '/contract/c1');
+  it('subject link points to contract detail page', () => {
+    renderTable([makeContract({ contract_id: 'c1', scanned_suggested_title: 'Managed services' })]);
+    const subjectLink = screen.getByRole('link', { name: 'Managed services' });
+    expect(subjectLink).toHaveAttribute('href', '/contract/c1');
   });
 
-  it('all-contracts variant enables sorting on Subject, Type, and Subtype', () => {
+  it('subject column falls back to contract_title when scanned_suggested_title is missing', () => {
+    renderTable([makeContract({ contract_id: 'c1', scanned_suggested_title: undefined, contract_title: 'Fallback Title' })]);
+    const link = screen.getByRole('link', { name: 'Fallback Title' });
+    expect(link).toHaveAttribute('href', '/contract/c1');
+  });
+
+  it('enables sorting on Subject and Subtype', () => {
     const onSortChange = vi.fn();
     renderTable(
       [
         makeContract({
           scanned_suggested_title: 'Managed services',
-          scanned_service_type: 'it_services',
           scanned_service_subtype: 'helpdesk',
         }),
       ],
@@ -182,9 +198,6 @@ describe('ContractsTable', () => {
 
     fireEvent.click(screen.getByTestId('th-scanned_suggested_title'));
     expect(onSortChange).toHaveBeenCalledWith([['scanned_suggested_title', 'asc']]);
-
-    fireEvent.click(screen.getByTestId('th-scanned_service_type'));
-    expect(onSortChange).toHaveBeenCalledWith([['scanned_service_type', 'asc']]);
 
     fireEvent.click(screen.getByTestId('th-scanned_service_subtype'));
     expect(onSortChange).toHaveBeenCalledWith([['scanned_service_subtype', 'asc']]);
