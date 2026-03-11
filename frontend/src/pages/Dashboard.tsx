@@ -149,7 +149,12 @@ export default function Dashboard() {
     // When groupBy is red_flag_type, build aggregation + treemap client-side
     // from the RedFlagStore data, because the backend doesn't know about red flags.
     if (effectiveGroupBy === 'red_flag_type') {
-      const flags = getFlagsForDatasets(selectedRfDatasets);
+      let flags = getFlagsForDatasets(selectedRfDatasets);
+
+      // Apply red_flag_types filter if set
+      if (filters.red_flag_types?.length) {
+        flags = flags.filter((f) => filters.red_flag_types!.includes(f.red_flag_type));
+      }
 
       // Group flags by red_flag_type (use red_flag_name as display label)
       const groups = new Map<string, { name: string; spend: number; count: number; maxVal: number }>();

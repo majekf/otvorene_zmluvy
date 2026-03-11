@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AccordionContracts, { mergeGroupFilter } from '../components/AccordionContracts';
+import { RedFlagProvider } from '../RedFlagStore';
 import * as api from '../api';
 
 vi.mock('../api');
@@ -92,7 +93,9 @@ function renderComponent(
   };
   return render(
     <MemoryRouter>
-      <AccordionContracts {...defaults} {...props} />
+      <RedFlagProvider>
+        <AccordionContracts {...defaults} {...props} />
+      </RedFlagProvider>
     </MemoryRouter>,
   );
 }
@@ -350,5 +353,10 @@ describe('mergeGroupFilter', () => {
     const base = { text_search: 'test' };
     mergeGroupFilter(base, 'category', 'x');
     expect(base).toEqual({ text_search: 'test' });
+  });
+
+  it('adds red_flag_types for groupBy=red_flag_type', () => {
+    const result = mergeGroupFilter({}, 'red_flag_type', 'new_vendor_large_contract');
+    expect(result.red_flag_types).toEqual(['new_vendor_large_contract']);
   });
 });
