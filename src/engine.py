@@ -394,7 +394,11 @@ class DataStore:
 
         if filters.red_flag_types:
             rf_set = set(filters.red_flag_types)
-            result = [c for c in result if c.red_flag_type and c.red_flag_type in rf_set]
+            result = [
+                c for c in result
+                if (c.red_flag_type and c.red_flag_type in rf_set)
+                or (c.red_flag_name and c.red_flag_name in rf_set)
+            ]
 
         if filters.red_flag_datasets:
             ds_set = set(filters.red_flag_datasets)
