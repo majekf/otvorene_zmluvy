@@ -9,7 +9,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AccordionContracts, { mergeGroupFilter } from '../components/AccordionContracts';
-import { RedFlagProvider } from '../RedFlagStore';
 import * as api from '../api';
 
 vi.mock('../api');
@@ -93,9 +92,7 @@ function renderComponent(
   };
   return render(
     <MemoryRouter>
-      <RedFlagProvider>
-        <AccordionContracts {...defaults} {...props} />
-      </RedFlagProvider>
+      <AccordionContracts {...defaults} {...props} />
     </MemoryRouter>,
   );
 }
