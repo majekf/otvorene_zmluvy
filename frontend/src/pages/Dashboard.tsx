@@ -57,6 +57,7 @@ export default function Dashboard() {
     datasetNames: rfDatasetNames,
     allFlagTypes: rfFlagTypes,
     contractFlagMap,
+    getFlagsForDatasets,
     vendorFlagCounts: getVendorFlagCounts,
     institutionFlagCounts: getInstitutionFlagCounts,
   } = useRedFlagContext();
@@ -145,6 +146,67 @@ export default function Dashboard() {
     let cancelled = false;
     setLoading(true);
 
+    // When groupBy is red_flag_type, build aggregation + treemap client-side
+    // from the RedFlagStore data, because the backend doesn't know about red flags.
+    if (effectiveGroupBy === 'red_flag_type') {
+      const flags = getFlagsForDatasets(selectedRfDatasets);
+
+      // Group flags by red_flag_type (use red_flag_name as display label)
+      const groups = new Map<string, { name: string; spend: number; count: number; maxVal: number }>();
+      for (const flag of flags) {
+        const key = flag.red_flag_type;
+        if (!groups.has(key)) {
+          groups.set(key, { name: flag.red_flag_name || key, spend: 0, count: 0, maxVal: 0 });
+        }
+        const g = groups.get(key)!;
+        const val = flag.price_numeric_eur ?? 0;
+        g.spend += val;
+        g.count += 1;
+        if (val > g.maxVal) g.maxVal = val;
+      }
+
+      const results = Array.from(groups.entries()).map(([key, g]) => ({
+        group_key: key,
+        group_value: g.name,
+        contract_count: g.count,
+        total_spend: g.spend,
+        avg_value: g.count > 0 ? g.spend / g.count : 0,
+        max_value: g.maxVal,
+      }));
+
+      const totalSpend = results.reduce((s, r) => s + r.total_spend, 0);
+      const totalCount = results.reduce((s, r) => s + r.contract_count, 0);
+
+      const aggRes: AggregationsResponse = {
+        group_by: 'red_flag_type',
+        results,
+        summary: {
+          total_spend: totalSpend,
+          contract_count: totalCount,
+          avg_value: totalCount > 0 ? totalSpend / totalCount : 0,
+          max_value: Math.max(0, ...results.map((r) => r.max_value)),
+        },
+      };
+
+      const treemapRes: TreemapNode = {
+        name: 'Red Flag Types',
+        value: totalSpend,
+        children: results.map((r) => ({
+          name: r.group_value,
+          value: r.total_spend,
+          contract_count: r.contract_count,
+        })),
+      };
+
+      if (!cancelled) {
+        setAggregations(aggRes);
+        setTreemapData(treemapRes);
+        setError(flags.length === 0 ? null : null);
+        setLoading(false);
+      }
+      return () => { cancelled = true; };
+    }
+
     Promise.all([
       fetchAggregations(filters, effectiveGroupBy as GroupByField),
       fetchTreemap(filters, effectiveGroupBy as GroupByField),
@@ -165,7 +227,7 @@ export default function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [filters, effectiveGroupBy]);
+  }, [filters, effectiveGroupBy, getFlagsForDatasets, selectedRfDatasets]);
 
   const handleFilterChange = useCallback((newFilters: typeof filters) => {
     setFilters(newFilters);
@@ -208,8 +270,16 @@ export default function Dashboard() {
         date_from: `${groupValue}-01`,
         date_to: `${groupValue}-${String(endDay).padStart(2, '0')}`,
       });
+      return;
     }
-  }, [filters, groupBy, effectiveGroupBy, setFilters]);
+    if (groupBy === 'red_flag_type') {
+      // groupValue is the red_flag_name (display label); find the matching red_flag_type id
+      const flags = getFlagsForDatasets(selectedRfDatasets);
+      const match = flags.find((f) => f.red_flag_name === groupValue || f.red_flag_type === groupValue);
+      const flagType = match?.red_flag_type ?? groupValue;
+      setFilters({ ...filters, red_flag_types: [flagType] });
+    }
+  }, [filters, groupBy, effectiveGroupBy, setFilters, getFlagsForDatasets, selectedRfDatasets]);
 
   return (
     <div data-testid="dashboard" className="space-y-8 animate-fade-in">
