@@ -201,7 +201,7 @@ export default function Dashboard() {
       if (!cancelled) {
         setAggregations(aggRes);
         setTreemapData(treemapRes);
-        setError(flags.length === 0 ? null : null);
+        setError(null);
         setLoading(false);
       }
       return () => { cancelled = true; };

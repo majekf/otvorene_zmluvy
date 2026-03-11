@@ -96,7 +96,7 @@ export default function RulePanel({ filters, onFlagsChange }: RulePanelProps) {
       setLastEvalResult({
         flags: result.flags,
         totalFlags: result.total_flags,
-        totalEvaluated: Object.keys(result.contract_severities).length + result.total_flags,
+        totalEvaluated: Object.keys(result.contract_severities).length,
       });
       onFlagsChange?.(result.contract_severities, result.flags);
     } catch {
