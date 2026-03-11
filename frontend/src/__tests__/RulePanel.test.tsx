@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import RulePanel from '../components/RulePanel';
+import { RedFlagProvider } from '../RedFlagStore';
 
 // Mock the API module
 vi.mock('../api', () => ({
@@ -55,9 +56,9 @@ describe('RulePanel', () => {
 
   it('renders the rule panel', async () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter><RedFlagProvider>
         <RulePanel filters={{}} />
-      </MemoryRouter>,
+      </RedFlagProvider></MemoryRouter>,
     );
 
     await waitFor(() => {
@@ -67,9 +68,9 @@ describe('RulePanel', () => {
 
   it('loads and displays presets', async () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter><RedFlagProvider>
         <RulePanel filters={{}} />
-      </MemoryRouter>,
+      </RedFlagProvider></MemoryRouter>,
     );
 
     await waitFor(() => {
@@ -80,9 +81,9 @@ describe('RulePanel', () => {
 
   it('slider changes update params', async () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter><RedFlagProvider>
         <RulePanel filters={{}} />
-      </MemoryRouter>,
+      </RedFlagProvider></MemoryRouter>,
     );
 
     await waitFor(() => {
@@ -97,9 +98,9 @@ describe('RulePanel', () => {
   it('evaluate button calls API', async () => {
     const onFlagsChange = vi.fn();
     render(
-      <MemoryRouter>
+      <MemoryRouter><RedFlagProvider>
         <RulePanel filters={{}} onFlagsChange={onFlagsChange} />
-      </MemoryRouter>,
+      </RedFlagProvider></MemoryRouter>,
     );
 
     await waitFor(() => {
@@ -116,9 +117,9 @@ describe('RulePanel', () => {
 
   it('displays results after evaluation', async () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter><RedFlagProvider>
         <RulePanel filters={{}} />
-      </MemoryRouter>,
+      </RedFlagProvider></MemoryRouter>,
     );
 
     await waitFor(() => {
@@ -135,9 +136,9 @@ describe('RulePanel', () => {
 
   it('toggling a rule checkbox works', async () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter><RedFlagProvider>
         <RulePanel filters={{}} />
-      </MemoryRouter>,
+      </RedFlagProvider></MemoryRouter>,
     );
 
     await waitFor(() => {

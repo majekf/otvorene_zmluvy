@@ -2,13 +2,14 @@
  * Tests for RedFlagsView page
  *
  * Covers: rendering, filter bar integration, RulePanel and ConditionBuilder
- * panels, loading states, and absence of dashboard-specific elements.
+ * panels, loading states, dataset management, and absence of dashboard-specific elements.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import RedFlagsView from '../pages/RedFlagsView';
 import { FilterProvider } from '../FilterContext';
+import { RedFlagProvider } from '../RedFlagStore';
 import * as api from '../api';
 import type { RulePreset } from '../types';
 
@@ -35,9 +36,11 @@ function renderPage(route = '/red-flags') {
   return render(
     <MemoryRouter initialEntries={[route]}>
       <FilterProvider>
-        <Routes>
-          <Route path="/red-flags" element={<RedFlagsView />} />
-        </Routes>
+        <RedFlagProvider>
+          <Routes>
+            <Route path="/red-flags" element={<RedFlagsView />} />
+          </Routes>
+        </RedFlagProvider>
       </FilterProvider>
     </MemoryRouter>,
   );
@@ -85,6 +88,23 @@ describe('RedFlagsView', () => {
     expect(screen.getByTestId('condition-builder')).toBeInTheDocument();
   });
 
+  // ── Dataset management ────────────────────────────────────────────
+
+  it('renders dataset manager section', () => {
+    renderPage();
+    expect(screen.getByTestId('dataset-manager')).toBeInTheDocument();
+  });
+
+  it('shows empty state when no datasets loaded', () => {
+    renderPage();
+    expect(screen.getByText(/No datasets loaded/i)).toBeInTheDocument();
+  });
+
+  it('renders upload dataset button', () => {
+    renderPage();
+    expect(screen.getByTestId('upload-dataset-btn')).toBeInTheDocument();
+  });
+
   // ── Panels always visible (no toggle) ─────────────────────────────
 
   it('does NOT have a toggle-rules button', () => {
@@ -127,6 +147,33 @@ describe('RedFlagsView', () => {
     await waitFor(() => {
       expect(screen.getByText('Threshold Proximity')).toBeInTheDocument();
       expect(screen.getByText('Vendor Concentration')).toBeInTheDocument();
+    });
+  });
+
+  // ── Severity selectors ────────────────────────────────────────────
+
+  it('displays severity selectors for each preset rule', async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('severity-select-threshold_proximity')).toBeInTheDocument();
+      expect(screen.getByTestId('severity-select-vendor_concentration')).toBeInTheDocument();
+    });
+  });
+
+  it('severity selector defaults to moderate', async () => {
+    renderPage();
+    await waitFor(() => {
+      const select = screen.getByTestId('severity-select-threshold_proximity') as HTMLSelectElement;
+      expect(select.value).toBe('moderate');
+    });
+  });
+
+  // ── Dataset name input ────────────────────────────────────────────
+
+  it('displays dataset name input', async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('dataset-name-input')).toBeInTheDocument();
     });
   });
 
