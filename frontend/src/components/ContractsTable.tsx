@@ -107,18 +107,18 @@ export const TABLE_COLUMNS: ColumnDef[] = [
   },
 ];
 
-/** Extra column shown when groupBy is red_flag_type. */
+/** Extra column shown when red flag data is present. */
 export const RED_FLAG_COLUMN: ColumnDef = {
-  key: '_red_flag_type',
+  key: 'red_flag_name',
   label: 'Red Flag Type',
-  sortable: false,
+  sortable: true,
   className: 'w-[16%] truncate',
   render: (c) => {
-    const flagType = (c as Contract & { _red_flag_type?: string })._red_flag_type;
-    const desc = (c as Contract & { _red_flag_description?: string })._red_flag_description;
-    return flagType ? (
+    const flagName = c.red_flag_name;
+    const desc = c.red_flag_description;
+    return flagName ? (
       <span className="inline-flex items-center gap-1 text-orange-700 bg-orange-50 px-2 py-0.5 rounded-full text-xs font-medium" title={desc || ''}>
-        🚩 {flagType}
+        🚩 {flagName}
       </span>
     ) : '—';
   },

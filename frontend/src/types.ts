@@ -111,6 +111,12 @@ export interface Contract {
   public_procurement_url?: string | null;
   // Embedded tender (returned by /api/contracts/{id} when a match exists)
   _tender?: Tender | null;
+  // Red flag fields (populated when contract has merged red flag data)
+  red_flag_type?: string | null;
+  red_flag_name?: string | null;
+  red_flag_severity?: string | null;
+  red_flag_description?: string | null;
+  red_flag_dataset?: string | null;
 }
 
 export interface FilterState {

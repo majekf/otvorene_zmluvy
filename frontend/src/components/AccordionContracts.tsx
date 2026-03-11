@@ -9,15 +9,14 @@
  * field so the component can build a merged filter that narrows to
  * the specific group value.
  *
- * When groupBy is 'red_flag_type', contract data is sourced client-side
- * from the RedFlagStore because the backend has no red flag knowledge.
+ * Red flag data is now merged into contracts on the backend, so
+ * red_flag_type grouping uses the same API flow as all other fields.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { FilterState, SortSpec, PaginatedContracts, GroupByField, Contract } from '../types';
+import type { FilterState, SortSpec, PaginatedContracts, GroupByField } from '../types';
 import { fetchContracts } from '../api';
-import { useRedFlagContext } from '../RedFlagStore';
 import ContractsTable from './ContractsTable';
 import Pagination from './Pagination';
 import { TableSkeleton } from './LoadingSkeleton';
@@ -86,7 +85,6 @@ export default function AccordionContracts({
   groupValue,
 }: AccordionContractsProps) {
   const navigate = useNavigate();
-  const { getFlagsForDatasets, datasetNames: rfDatasetNames } = useRedFlagContext();
   const [sort, setSort] = useState<SortSpec>([]);
   const [page, setPage] = useState(1);
   const pageSize = 10;
@@ -96,68 +94,7 @@ export default function AccordionContracts({
 
   const mergedFilters = mergeGroupFilter(filters, groupBy, groupValue);
 
-  // For red_flag_type grouping, build contract data client-side from RedFlagStore
-  const redFlagContracts = useMemo<Contract[] | null>(() => {
-    if (groupBy !== 'red_flag_type') return null;
-    const selectedDatasets = filters.red_flag_datasets ?? rfDatasetNames;
-    let flags = getFlagsForDatasets(selectedDatasets);
-    // Filter to the specific red_flag_type (groupValue is the red_flag_name display label)
-    flags = flags.filter((f) => f.red_flag_name === groupValue || f.red_flag_type === groupValue);
-    // Convert flags to Contract objects for the table
-    return flags.map((f) => ({
-      contract_id: f.contract_id,
-      contract_title: f.contract_title || null,
-      contract_number: null,
-      contract_number_detail: null,
-      contract_type: null,
-      buyer: f.institution || null,
-      buyer_detail: null,
-      supplier: f.vendor || null,
-      supplier_detail: null,
-      price_numeric_eur: f.price_numeric_eur,
-      price_raw: null,
-      published_date: f.date_published || null,
-      published_day: null,
-      published_month: null,
-      published_year: null,
-      category: f.category,
-      award_type: f.award_type,
-      pdf_text_summary: '',
-      contract_url: null,
-      ico_buyer: f.ico_buyer || null,
-      ico_supplier: f.ico_supplier || null,
-      date_published: f.date_published || null,
-      date_concluded: null,
-      date_effective: null,
-      date_valid_until: null,
-      pdf_url: null,
-      pdf_urls: null,
-      pdf_text: null,
-      scraped_at: null,
-      rezort: null,
-      scanned_suggested_title: f.contract_title || null,
-      // Attach red flag info for display
-      _red_flag_type: f.red_flag_name || f.red_flag_type,
-      _red_flag_description: f.description,
-      _red_flag_severity: f.severity,
-    } as Contract & { _red_flag_type?: string; _red_flag_description?: string; _red_flag_severity?: string }));
-  }, [groupBy, groupValue, filters.red_flag_datasets, rfDatasetNames, getFlagsForDatasets]);
-
   useEffect(() => {
-    // For red_flag_type, use client-side data
-    if (groupBy === 'red_flag_type' && redFlagContracts !== null) {
-      setData({
-        total: redFlagContracts.length,
-        page: 1,
-        page_size: redFlagContracts.length,
-        total_pages: 1,
-        contracts: redFlagContracts,
-      });
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
     let cancelled = false;
     setLoading(true);
     fetchContracts(mergedFilters, page, pageSize, sort)
@@ -175,7 +112,7 @@ export default function AccordionContracts({
       });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, sort, groupBy, groupValue, JSON.stringify(filters), redFlagContracts]);
+  }, [page, sort, groupBy, groupValue, JSON.stringify(filters)]);
 
   const handleSortChange = useCallback((s: SortSpec) => {
     setSort(s);
@@ -207,6 +144,9 @@ export default function AccordionContracts({
     );
   }
 
+  // Show red flag column when any contract in the results has red flag data
+  const hasRedFlags = data.contracts.some((c) => c.red_flag_type);
+
   return (
     <div data-testid={`accordion-contracts-${groupValue}`}>
       <ContractsTable
@@ -214,7 +154,7 @@ export default function AccordionContracts({
         sort={sort}
         onSortChange={handleSortChange}
         onRowClick={handleRowClick}
-        showRedFlagColumn={groupBy === 'red_flag_type'}
+        showRedFlagColumn={hasRedFlags}
       />
       {data.total > pageSize && (
         <Pagination

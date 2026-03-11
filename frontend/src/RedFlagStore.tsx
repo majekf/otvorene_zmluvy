@@ -19,6 +19,7 @@ import type {
   RedFlagOccurrence,
   RedFlagSeverity,
 } from './types';
+import { mergeRedFlagDataset, removeRedFlagDataset } from './api';
 
 // ── Context shape ──────────────────────────────────────────────────
 
@@ -63,10 +64,18 @@ export function RedFlagProvider({ children }: { children: ReactNode }) {
       const filtered = prev.filter((d) => d.dataset_name !== dataset.dataset_name);
       return [...filtered, dataset];
     });
+    // Push to backend so red flag data merges into the contracts store
+    mergeRedFlagDataset(dataset as unknown as Record<string, unknown>).catch(() => {
+      // Non-fatal: filters still work client-side as fallback
+    });
   }, []);
 
   const removeDataset = useCallback((name: string) => {
     setDatasets((prev) => prev.filter((d) => d.dataset_name !== name));
+    // Remove from backend contracts store
+    removeRedFlagDataset(name).catch(() => {
+      // Non-fatal
+    });
   }, []);
 
   const datasetNames = useMemo(
