@@ -128,6 +128,13 @@ export interface FilterState {
   value_max?: number;
   award_types?: string[];
   text_search?: string;
+  // Red flag filters
+  red_flag_datasets?: string[];
+  red_flag_types?: string[];
+  institution_flag_count_min?: number;
+  institution_flag_count_max?: number;
+  vendor_flag_count_min?: number;
+  vendor_flag_count_max?: number;
 }
 
 export interface PaginatedContracts {
@@ -278,7 +285,7 @@ export interface TrendsResponseWithOverlays extends TrendsResponse {
 
 export type SortSpec = [string, string][];
 
-export type GroupByField = 'category' | 'supplier' | 'buyer' | 'month' | 'award_type';
+export type GroupByField = 'category' | 'supplier' | 'buyer' | 'month' | 'award_type' | 'red_flag_type';
 
 // ── Phase 9: Compare (Contracts vs Subcontractors) types ────────────
 
@@ -461,4 +468,41 @@ export interface WorkspaceSaveResponse {
 
 export interface WorkspaceLoadResponse {
   snapshot: WorkspaceSnapshot;
+}
+
+// ── Red Flag Dataset types ──────────────────────────────────────────
+
+export type RedFlagSeverity = 'mild' | 'moderate' | 'severe';
+
+export interface RedFlagOccurrence {
+  contract_id: string;
+  contract_title: string;
+  institution: string;
+  vendor: string;
+  ico_buyer: string | null;
+  ico_supplier: string | null;
+  price_numeric_eur: number | null;
+  date_published: string | null;
+  category: string;
+  award_type: string;
+  red_flag_type: string;
+  red_flag_name: string;
+  severity: RedFlagSeverity;
+  description: string;
+}
+
+export interface RedFlagRuleUsed {
+  rule_id: string;
+  rule_name: string;
+  severity_label: RedFlagSeverity;
+  params: Record<string, number>;
+}
+
+export interface RedFlagDataset {
+  dataset_name: string;
+  created_at: string;
+  total_flags: number;
+  total_contracts_evaluated: number;
+  rules_used: RedFlagRuleUsed[];
+  flags: RedFlagOccurrence[];
 }

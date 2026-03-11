@@ -1,13 +1,15 @@
 /**
  * RulePanel Component (Phase 4)
  *
- * Displays preset rules with param editors (sliders + number inputs)
- * and an "Evaluate" button. Shows results as a list of flags.
+ * Displays preset rules with param editors (sliders + number inputs),
+ * severity selectors per rule, dataset naming, and an "Evaluate" button.
+ * Shows results as a list of flags with download capability.
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import type { RulePreset, RuleConfig, RuleFlagItem, FilterState } from '../types';
+import type { RulePreset, RuleConfig, RuleFlagItem, FilterState, RedFlagSeverity, RedFlagDataset, RedFlagOccurrence, RedFlagRuleUsed } from '../types';
 import { fetchRulePresets, evaluateRules } from '../api';
+import { useRedFlagContext, defaultDatasetName, severityEmoji } from '../RedFlagStore';
 import RuleBadge from './RuleBadge';
 import SeverityIndicator from './SeverityIndicator';
 
@@ -20,10 +22,19 @@ export default function RulePanel({ filters, onFlagsChange }: RulePanelProps) {
   const [presets, setPresets] = useState<RulePreset[]>([]);
   const [enabledRules, setEnabledRules] = useState<Set<string>>(new Set());
   const [paramOverrides, setParamOverrides] = useState<Record<string, Record<string, number>>>({});
+  const [severityOverrides, setSeverityOverrides] = useState<Record<string, RedFlagSeverity>>({});
   const [flags, setFlags] = useState<RuleFlagItem[]>([]);
   const [totalFlags, setTotalFlags] = useState(0);
   const [loading, setLoading] = useState(false);
   const [presetsLoading, setPresetsLoading] = useState(true);
+  const [datasetName, setDatasetName] = useState('');
+  const [lastEvalResult, setLastEvalResult] = useState<{
+    flags: RuleFlagItem[];
+    totalFlags: number;
+    totalEvaluated: number;
+  } | null>(null);
+
+  const { addDataset } = useRedFlagContext();
 
   // Load presets on mount
   useEffect(() => {
@@ -34,10 +45,13 @@ export default function RulePanel({ filters, onFlagsChange }: RulePanelProps) {
         setEnabledRules(new Set(res.presets.map((p) => p.id)));
         // Set default params
         const defaults: Record<string, Record<string, number>> = {};
+        const defaultSeverities: Record<string, RedFlagSeverity> = {};
         for (const p of res.presets) {
           defaults[p.id] = { ...p.params };
+          defaultSeverities[p.id] = 'moderate';
         }
         setParamOverrides(defaults);
+        setSeverityOverrides(defaultSeverities);
       })
       .catch(() => {})
       .finally(() => setPresetsLoading(false));
@@ -59,6 +73,13 @@ export default function RulePanel({ filters, onFlagsChange }: RulePanelProps) {
     }));
   }, []);
 
+  const updateSeverity = useCallback((ruleId: string, severity: RedFlagSeverity) => {
+    setSeverityOverrides((prev) => ({
+      ...prev,
+      [ruleId]: severity,
+    }));
+  }, []);
+
   const handleEvaluate = useCallback(async () => {
     setLoading(true);
     try {
@@ -72,6 +93,11 @@ export default function RulePanel({ filters, onFlagsChange }: RulePanelProps) {
       const result = await evaluateRules(rules.length > 0 ? rules : null, filters);
       setFlags(result.flags);
       setTotalFlags(result.total_flags);
+      setLastEvalResult({
+        flags: result.flags,
+        totalFlags: result.total_flags,
+        totalEvaluated: Object.keys(result.contract_severities).length + result.total_flags,
+      });
       onFlagsChange?.(result.contract_severities, result.flags);
     } catch {
       // ignore
@@ -79,6 +105,65 @@ export default function RulePanel({ filters, onFlagsChange }: RulePanelProps) {
       setLoading(false);
     }
   }, [presets, enabledRules, paramOverrides, filters, onFlagsChange]);
+
+  const buildDataset = useCallback((): RedFlagDataset => {
+    const name = datasetName.trim() || defaultDatasetName();
+    const now = new Date().toISOString();
+
+    const rulesUsed: RedFlagRuleUsed[] = presets
+      .filter((p) => enabledRules.has(p.id))
+      .map((p) => ({
+        rule_id: p.id,
+        rule_name: p.name,
+        severity_label: severityOverrides[p.id] || 'moderate',
+        params: paramOverrides[p.id] || p.params,
+      }));
+
+    const flagOccurrences: RedFlagOccurrence[] = (lastEvalResult?.flags || []).map((f) => ({
+      contract_id: f.contract_id || '',
+      contract_title: (f.details?.contract_title as string) || '',
+      institution: f.institution || '',
+      vendor: f.vendor || '',
+      ico_buyer: (f.details?.ico_buyer as string) || null,
+      ico_supplier: (f.details?.ico_supplier as string) || null,
+      price_numeric_eur: (f.details?.price_numeric_eur as number) || null,
+      date_published: (f.details?.date_published as string) || null,
+      category: (f.details?.category as string) || '',
+      award_type: (f.details?.award_type as string) || '',
+      red_flag_type: f.rule_id,
+      red_flag_name: f.rule_name,
+      severity: severityOverrides[f.rule_id] || 'moderate',
+      description: f.description,
+    }));
+
+    return {
+      dataset_name: name,
+      created_at: now,
+      total_flags: lastEvalResult?.totalFlags || 0,
+      total_contracts_evaluated: lastEvalResult?.totalEvaluated || 0,
+      rules_used: rulesUsed,
+      flags: flagOccurrences,
+    };
+  }, [datasetName, presets, enabledRules, severityOverrides, paramOverrides, lastEvalResult]);
+
+  const handleDownload = useCallback(() => {
+    const dataset = buildDataset();
+    const json = JSON.stringify(dataset, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `red_flags_${dataset.dataset_name.replace(/\s+/g, '_')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [buildDataset]);
+
+  const handleAddToStore = useCallback(() => {
+    const dataset = buildDataset();
+    addDataset(dataset);
+  }, [buildDataset, addDataset]);
 
   if (presetsLoading) {
     return <div data-testid="rule-panel" className="text-sm text-slate-500">Loading rules…</div>;
@@ -105,7 +190,20 @@ export default function RulePanel({ filters, onFlagsChange }: RulePanelProps) {
                 className="mt-0.5 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
               />
               <div className="flex-1">
-                <div className="font-medium text-sm text-slate-800">{preset.name}</div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-sm text-slate-800">{preset.name}</span>
+                  {/* Severity selector */}
+                  <select
+                    value={severityOverrides[preset.id] || 'moderate'}
+                    onChange={(e) => updateSeverity(preset.id, e.target.value as RedFlagSeverity)}
+                    className="form-select text-xs py-0.5 px-1.5 w-auto"
+                    data-testid={`severity-select-${preset.id}`}
+                  >
+                    <option value="mild">🟡 Mild</option>
+                    <option value="moderate">🟠 Moderate</option>
+                    <option value="severe">🔴 Severe</option>
+                  </select>
+                </div>
                 <div className="text-xs text-slate-500 mt-0.5">{preset.description}</div>
 
                 {/* Param editors */}
@@ -142,22 +240,55 @@ export default function RulePanel({ filters, onFlagsChange }: RulePanelProps) {
         ))}
       </div>
 
-      {/* Evaluate button */}
-      <button
-        data-testid="evaluate-btn"
-        onClick={handleEvaluate}
-        disabled={loading || enabledRules.size === 0}
-        className="btn-primary disabled:opacity-50"
-      >
-        {loading ? 'Evaluating…' : 'Evaluate Rules'}
-      </button>
+      {/* Dataset name + Evaluate button */}
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col">
+          <label className="text-xs font-semibold text-slate-500 mb-1 tracking-wide uppercase">
+            Dataset Name
+          </label>
+          <input
+            type="text"
+            value={datasetName}
+            onChange={(e) => setDatasetName(e.target.value)}
+            placeholder="Auto-generated from datetime"
+            className="form-input text-sm w-64"
+            data-testid="dataset-name-input"
+          />
+        </div>
+        <button
+          data-testid="evaluate-btn"
+          onClick={handleEvaluate}
+          disabled={loading || enabledRules.size === 0}
+          className="btn-primary disabled:opacity-50"
+        >
+          {loading ? 'Evaluating…' : 'Evaluate Rules'}
+        </button>
+      </div>
 
       {/* Results */}
       {totalFlags > 0 && (
         <div data-testid="rule-results" className="space-y-2">
-          <h4 className="section-title text-sm">
-            {totalFlags} flag{totalFlags !== 1 ? 's' : ''} found
-          </h4>
+          <div className="flex items-center justify-between">
+            <h4 className="section-title text-sm">
+              {totalFlags} flag{totalFlags !== 1 ? 's' : ''} found
+            </h4>
+            <div className="flex gap-2">
+              <button
+                onClick={handleAddToStore}
+                className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700 transition-colors shadow-sm"
+                data-testid="add-to-store-btn"
+              >
+                Add to Active Datasets
+              </button>
+              <button
+                onClick={handleDownload}
+                className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-colors shadow-sm"
+                data-testid="download-dataset-btn"
+              >
+                ⬇ Download JSON
+              </button>
+            </div>
+          </div>
           <div className="max-h-80 overflow-y-auto space-y-1">
             {flags.map((flag, idx) => (
               <div
@@ -166,6 +297,9 @@ export default function RulePanel({ filters, onFlagsChange }: RulePanelProps) {
                 data-testid="rule-flag"
               >
                 <SeverityIndicator severity={flag.severity} />
+                <span className="text-sm" title={severityOverrides[flag.rule_id] || 'moderate'}>
+                  {severityEmoji(severityOverrides[flag.rule_id] || 'moderate')}
+                </span>
                 <RuleBadge ruleId={flag.rule_id} ruleName={flag.rule_name} />
                 <span className="text-slate-600 flex-1">{flag.description}</span>
               </div>
