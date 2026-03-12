@@ -3,11 +3,17 @@
  *
  * Expandable rows showing group name + aggregated total.
  * Click expands to reveal the contracts table.
+ * Optionally displays red flag count and severity badges.
  */
 
 import { useState } from 'react';
 import type { AggregationResult } from '../types';
 import { formatEur } from '../utils';
+
+interface RedFlagInfo {
+  count: number;
+  types: { type: string; severity: string }[];
+}
 
 interface CategoryAccordionProps {
   groups: AggregationResult[];
@@ -16,6 +22,8 @@ interface CategoryAccordionProps {
   /** Currently open groups (controlled from outside for URL state). */
   openGroups?: Set<string>;
   onToggle?: (groupValue: string) => void;
+  /** Optional red flag info per group. */
+  redFlagInfo?: Record<string, RedFlagInfo>;
 }
 
 export default function CategoryAccordion({
@@ -23,6 +31,7 @@ export default function CategoryAccordion({
   renderExpanded,
   openGroups: controlledOpen,
   onToggle,
+  redFlagInfo,
 }: CategoryAccordionProps) {
   const [internalOpen, setInternalOpen] = useState<Set<string>>(new Set());
   const openGroups = controlledOpen ?? internalOpen;
@@ -64,6 +73,24 @@ export default function CategoryAccordion({
                 <span className="chip chip-gray">
                   {g.contract_count} contract{g.contract_count !== 1 ? 's' : ''}
                 </span>
+                {redFlagInfo?.[g.group_value] && redFlagInfo[g.group_value].count > 0 && (
+                  <span className="chip bg-red-100 text-red-700" data-testid={`rf-count-${g.group_value}`}>
+                    🚩 {redFlagInfo[g.group_value].count} flag{redFlagInfo[g.group_value].count !== 1 ? 's' : ''}
+                  </span>
+                )}
+                {redFlagInfo?.[g.group_value]?.types?.map((t) => (
+                  <span
+                    key={t.type}
+                    className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium ${
+                      t.severity === 'severe' ? 'bg-red-100 text-red-700' :
+                      t.severity === 'moderate' ? 'bg-orange-100 text-orange-700' :
+                      'bg-yellow-100 text-yellow-700'
+                    }`}
+                    data-testid={`rf-type-badge-${g.group_value}`}
+                  >
+                    {t.severity === 'severe' ? '🔴' : t.severity === 'moderate' ? '🟠' : '🟡'} {t.type}
+                  </span>
+                ))}
               </div>
               <span className="font-bold text-slate-700 tabular-nums">{formatEur(g.total_spend)}</span>
             </button>

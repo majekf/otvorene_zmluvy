@@ -38,6 +38,12 @@ export function parseUrlState(search: string): UrlState {
   if (p.get('value_max')) filters.value_max = Number(p.get('value_max'));
   if (p.get('award_types')) filters.award_types = p.get('award_types')!.split('|');
   if (p.get('text_search')) filters.text_search = p.get('text_search')!;
+  if (p.get('red_flag_datasets')) filters.red_flag_datasets = p.get('red_flag_datasets')!.split('|');
+  if (p.get('red_flag_types')) filters.red_flag_types = p.get('red_flag_types')!.split('|');
+  if (p.get('institution_flag_count_min')) filters.institution_flag_count_min = Number(p.get('institution_flag_count_min'));
+  if (p.get('institution_flag_count_max')) filters.institution_flag_count_max = Number(p.get('institution_flag_count_max'));
+  if (p.get('vendor_flag_count_min')) filters.vendor_flag_count_min = Number(p.get('vendor_flag_count_min'));
+  if (p.get('vendor_flag_count_max')) filters.vendor_flag_count_max = Number(p.get('vendor_flag_count_max'));
 
   const sort: SortSpec = [];
   const sortStr = p.get('sort');
@@ -75,6 +81,12 @@ export function encodeUrlState(state: UrlState): string {
   if (f.value_max !== undefined) p.set('value_max', String(f.value_max));
   if (f.award_types?.length) p.set('award_types', f.award_types.join('|'));
   if (f.text_search) p.set('text_search', f.text_search);
+  if (f.red_flag_datasets?.length) p.set('red_flag_datasets', f.red_flag_datasets.join('|'));
+  if (f.red_flag_types?.length) p.set('red_flag_types', f.red_flag_types.join('|'));
+  if (f.institution_flag_count_min !== undefined) p.set('institution_flag_count_min', String(f.institution_flag_count_min));
+  if (f.institution_flag_count_max !== undefined) p.set('institution_flag_count_max', String(f.institution_flag_count_max));
+  if (f.vendor_flag_count_min !== undefined) p.set('vendor_flag_count_min', String(f.vendor_flag_count_min));
+  if (f.vendor_flag_count_max !== undefined) p.set('vendor_flag_count_max', String(f.vendor_flag_count_max));
 
   if (state.sort.length) {
     p.set('sort', state.sort.map(([field, dir]) => `${field}:${dir}`).join(','));

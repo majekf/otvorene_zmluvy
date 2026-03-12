@@ -17,6 +17,7 @@ const OPTIONS: { value: GroupByField; label: string }[] = [
   { value: 'category', label: 'Category' },
   { value: 'month', label: 'Month' },
   { value: 'award_type', label: 'Award Type' },
+  { value: 'red_flag_type', label: 'Red Flag Type' },
 ];
 
 export default function GroupByControl({ value, onChange }: GroupByControlProps) {

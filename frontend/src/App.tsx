@@ -16,6 +16,7 @@ import RedFlagsView from './pages/RedFlagsView';
 import ChatBar from './components/ChatBar';
 import ErrorBoundary from './components/ErrorBoundary';
 import { FilterProvider, useFilterContext } from './FilterContext';
+import { RedFlagProvider } from './RedFlagStore';
 
 function NavLink({ to, label }: { to: string; label: string }) {
   const { pathname } = useLocation();
@@ -135,7 +136,9 @@ function AppShell() {
 export default function App() {
   return (
     <FilterProvider>
-      <AppShell />
+      <RedFlagProvider>
+        <AppShell />
+      </RedFlagProvider>
     </FilterProvider>
   );
 }

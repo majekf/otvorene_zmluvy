@@ -28,10 +28,17 @@ describe('GroupByControl', () => {
     expect(onChange).toHaveBeenCalledWith('buyer');
   });
 
-  it('renders options in the correct order: Vendor, Institution, Category, Month, Award Type', () => {
+  it('renders options in the correct order: Vendor, Institution, Category, Month, Award Type, Red Flag Type', () => {
     render(<GroupByControl value="category" onChange={vi.fn()} />);
     const buttons = screen.getAllByRole('button');
     const labels = buttons.map((btn) => btn.textContent);
-    expect(labels).toEqual(['Vendor', 'Institution', 'Category', 'Month', 'Award Type']);
+    expect(labels).toEqual(['Vendor', 'Institution', 'Category', 'Month', 'Award Type', 'Red Flag Type']);
+  });
+
+  it('calls onChange with red_flag_type when Red Flag Type is clicked', () => {
+    const onChange = vi.fn();
+    render(<GroupByControl value="category" onChange={onChange} />);
+    fireEvent.click(screen.getByText('Red Flag Type'));
+    expect(onChange).toHaveBeenCalledWith('red_flag_type');
   });
 });

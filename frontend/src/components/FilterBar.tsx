@@ -30,6 +30,9 @@ interface FilterBarProps {
   scannedServiceSubtypeCounts?: Record<string, number>;
   awardTypes?: string[];
   optionsLoaded?: boolean;
+  // Red flag filter options
+  redFlagDatasetNames?: string[];
+  redFlagTypes?: string[];
 }
 
 function sortAlpha(values: string[]): string[] {
@@ -86,6 +89,8 @@ export default function FilterBar({
   scannedServiceSubtypeCounts = {},
   awardTypes = ['direct_award', 'open_tender', 'negotiated', 'unknown'],
   optionsLoaded = false,
+  redFlagDatasetNames = [],
+  redFlagTypes = [],
 }: FilterBarProps) {
   // Kept for backward compatibility of parent props; synchronisation now runs via shared slicer counts.
   void institutionIcoMap;
@@ -107,6 +112,8 @@ export default function FilterBar({
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [serviceTypeOpen, setServiceTypeOpen] = useState(false);
   const [serviceSubtypeOpen, setServiceSubtypeOpen] = useState(false);
+  const [rfDatasetOpen, setRfDatasetOpen] = useState(false);
+  const [rfTypeOpen, setRfTypeOpen] = useState(false);
 
   const institutionRef = useRef<HTMLDivElement | null>(null);
   const vendorRef = useRef<HTMLDivElement | null>(null);
@@ -115,6 +122,8 @@ export default function FilterBar({
   const categoryRef = useRef<HTMLDivElement | null>(null);
   const serviceTypeRef = useRef<HTMLDivElement | null>(null);
   const serviceSubtypeRef = useRef<HTMLDivElement | null>(null);
+  const rfDatasetRef = useRef<HTMLDivElement | null>(null);
+  const rfTypeRef = useRef<HTMLDivElement | null>(null);
 
   const sortedInstitutions = useMemo(() => sortAlpha(institutions), [institutions]);
   const sortedVendors = useMemo(() => sortAlpha(vendors), [vendors]);
@@ -287,6 +296,8 @@ export default function FilterBar({
       if (categoryRef.current && !categoryRef.current.contains(target)) setCategoryOpen(false);
       if (serviceTypeRef.current && !serviceTypeRef.current.contains(target)) setServiceTypeOpen(false);
       if (serviceSubtypeRef.current && !serviceSubtypeRef.current.contains(target)) setServiceSubtypeOpen(false);
+      if (rfDatasetRef.current && !rfDatasetRef.current.contains(target)) setRfDatasetOpen(false);
+      if (rfTypeRef.current && !rfTypeRef.current.contains(target)) setRfTypeOpen(false);
     }
 
     document.addEventListener('mousedown', onDocMouseDown);
@@ -318,6 +329,8 @@ export default function FilterBar({
     setCategoryOpen(false);
     setServiceTypeOpen(false);
     setServiceSubtypeOpen(false);
+    setRfDatasetOpen(false);
+    setRfTypeOpen(false);
     onChange({});
   }
 
@@ -452,6 +465,28 @@ export default function FilterBar({
   function clearServiceSubtypes() {
     update({ scanned_service_subtypes: [] });
   }
+
+  function toggleRfDataset(name: string) {
+    const selected = filters.red_flag_datasets ?? [];
+    const next = selected.includes(name)
+      ? selected.filter((d) => d !== name)
+      : [...selected, name];
+    update({ red_flag_datasets: next.length ? next : undefined });
+  }
+
+  function toggleRfType(name: string) {
+    const selected = filters.red_flag_types ?? [];
+    const next = selected.includes(name)
+      ? selected.filter((t) => t !== name)
+      : [...selected, name];
+    update({ red_flag_types: next.length ? next : undefined });
+  }
+
+  const rfTypesWithNoFlag = useMemo(() => {
+    const types = [...redFlagTypes];
+    if (!types.includes('no red flag')) types.push('no red flag');
+    return types;
+  }, [redFlagTypes]);
 
   return (
     <div
@@ -710,6 +745,80 @@ export default function FilterBar({
               </div>
             )}
           </div>
+        )}
+
+        {/* ── Red Flag Filters ────────────────────────────────── */}
+        {redFlagDatasetNames.length > 0 && (
+          <div className={`flex flex-col min-w-[200px] relative ${rfDatasetOpen ? 'z-[120]' : 'z-40'}`} ref={rfDatasetRef}>
+            <label className="text-xs font-semibold text-slate-500 mb-1.5 tracking-wide uppercase">🚩 RF Datasets</label>
+            <button type="button" data-testid="filter-rf-dataset-trigger" className="form-input text-left flex items-center justify-between" onClick={() => setRfDatasetOpen((v) => !v)}>
+              <span className="truncate">{(filters.red_flag_datasets?.length || 0) > 0 ? `Selected: ${filters.red_flag_datasets!.length}` : 'All datasets'}</span>
+              <span className="text-slate-400">{rfDatasetOpen ? '▴' : '▾'}</span>
+            </button>
+            {rfDatasetOpen && (
+              <div data-testid="filter-rf-dataset-dropdown" className="absolute z-[100] top-[calc(100%+6px)] left-0 w-full rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
+                  {redFlagDatasetNames.map((name) => (
+                    <label key={name} className="flex items-center gap-2 text-sm text-slate-700 px-1 py-0.5">
+                      <input
+                        type="checkbox"
+                        checked={(filters.red_flag_datasets ?? []).includes(name)}
+                        onChange={() => toggleRfDataset(name)}
+                      />
+                      <span className="flex-1 truncate">{name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {rfTypesWithNoFlag.length > 1 && (
+          <div className={`flex flex-col min-w-[200px] relative ${rfTypeOpen ? 'z-[120]' : 'z-40'}`} ref={rfTypeRef}>
+            <label className="text-xs font-semibold text-slate-500 mb-1.5 tracking-wide uppercase">🚩 RF Type</label>
+            <button type="button" data-testid="filter-rf-type-trigger" className="form-input text-left flex items-center justify-between" onClick={() => setRfTypeOpen((v) => !v)}>
+              <span className="truncate">{(filters.red_flag_types?.length || 0) > 0 ? `Selected: ${filters.red_flag_types!.length}` : 'All types'}</span>
+              <span className="text-slate-400">{rfTypeOpen ? '▴' : '▾'}</span>
+            </button>
+            {rfTypeOpen && (
+              <div data-testid="filter-rf-type-dropdown" className="absolute z-[100] top-[calc(100%+6px)] left-0 w-full rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
+                  {rfTypesWithNoFlag.map((t) => (
+                    <label key={t} className="flex items-center gap-2 text-sm text-slate-700 px-1 py-0.5">
+                      <input
+                        type="checkbox"
+                        checked={(filters.red_flag_types ?? []).includes(t)}
+                        onChange={() => toggleRfType(t)}
+                      />
+                      <span className="flex-1 truncate">{t}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {redFlagDatasetNames.length > 0 && (
+          <>
+            <div className="flex flex-col">
+              <label className="text-xs font-semibold text-slate-500 mb-1.5 tracking-wide uppercase">🚩 Inst. flag count min</label>
+              <input data-testid="filter-inst-flag-min" type="number" className="form-input w-28" placeholder="0" min={0} value={filters.institution_flag_count_min ?? ''} onChange={(e) => update({ institution_flag_count_min: e.target.value ? Number(e.target.value) : undefined })} />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-xs font-semibold text-slate-500 mb-1.5 tracking-wide uppercase">🚩 Inst. flag count max</label>
+              <input data-testid="filter-inst-flag-max" type="number" className="form-input w-28" placeholder="∞" min={0} value={filters.institution_flag_count_max ?? ''} onChange={(e) => update({ institution_flag_count_max: e.target.value ? Number(e.target.value) : undefined })} />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-xs font-semibold text-slate-500 mb-1.5 tracking-wide uppercase">🚩 Vendor flag count min</label>
+              <input data-testid="filter-vendor-flag-min" type="number" className="form-input w-28" placeholder="0" min={0} value={filters.vendor_flag_count_min ?? ''} onChange={(e) => update({ vendor_flag_count_min: e.target.value ? Number(e.target.value) : undefined })} />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-xs font-semibold text-slate-500 mb-1.5 tracking-wide uppercase">🚩 Vendor flag count max</label>
+              <input data-testid="filter-vendor-flag-max" type="number" className="form-input w-28" placeholder="∞" min={0} value={filters.vendor_flag_count_max ?? ''} onChange={(e) => update({ vendor_flag_count_max: e.target.value ? Number(e.target.value) : undefined })} />
+            </div>
+          </>
         )}
 
         <div className="flex flex-col">

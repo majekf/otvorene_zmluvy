@@ -52,6 +52,8 @@ function filterParams(filters: FilterState): Record<string, string> {
   if (filters.value_max !== undefined) p.value_max = String(filters.value_max);
   if (filters.award_types?.length) p.award_types = filters.award_types.join('|');
   if (filters.text_search) p.text_search = filters.text_search;
+  if (filters.red_flag_types?.length) p.red_flag_types = filters.red_flag_types.join('|');
+  if (filters.red_flag_datasets?.length) p.red_flag_datasets = filters.red_flag_datasets.join('|');
   return p;
 }
 
@@ -250,6 +252,20 @@ export function pdfExportUrl(
   const p = filterParams(filters);
   if (sort.length) p.sort = sortParam(sort);
   return `/api/export/pdf${qs(p)}`;
+}
+
+// ── Red Flag Dataset Merge ───────────────────────────────────────────
+
+export async function mergeRedFlagDataset(
+  dataset: Record<string, unknown>,
+): Promise<{ merged: number; dataset_name: string }> {
+  return post<{ merged: number; dataset_name: string }>('/api/red-flags/merge', dataset);
+}
+
+export async function removeRedFlagDataset(
+  datasetName: string,
+): Promise<{ removed: number; dataset_name: string }> {
+  return post<{ removed: number; dataset_name: string }>('/api/red-flags/remove', { dataset_name: datasetName });
 }
 
 // ── Rules (Phase 4) ─────────────────────────────────────────────────

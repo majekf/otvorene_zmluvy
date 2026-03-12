@@ -3,6 +3,7 @@
  *
  * Landing page showing overview: filter bar, treemap/bar chart,
  * and accordion breakdown with inline contract drill-down.
+ * Includes red flag integration for charts, grouping, and tables.
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -11,6 +12,7 @@ import type { SortSpec, GroupByField, AggregationsResponse, TreemapNode } from '
 import { fetchAggregations, fetchTreemap } from '../api';
 import { parseUrlState, encodeUrlState } from '../url-state';
 import { useFilterContext } from '../FilterContext';
+import { useRedFlagContext } from '../RedFlagStore';
 import FilterBar from '../components/FilterBar';
 import GroupByControl from '../components/GroupByControl';
 import WorkspaceToolbar from '../components/WorkspaceToolbar';
@@ -51,6 +53,19 @@ export default function Dashboard() {
     awardTypes: distinctAwardTypes,
     optionsLoaded,
   } = useFilterContext();
+  const {
+    datasetNames: rfDatasetNames,
+    allFlagTypes: rfFlagTypes,
+    contractFlagMap,
+  } = useRedFlagContext();
+
+  // Red flag computed data for the selected datasets
+  const selectedRfDatasets = filters.red_flag_datasets ?? rfDatasetNames;
+  const rfContractMap = useMemo(
+    () => contractFlagMap(selectedRfDatasets),
+    [contractFlagMap, selectedRfDatasets],
+  );
+
   const [sort] = useState<SortSpec>(urlState.sort);
   const [groupBy, setGroupBy] = useState<GroupByField>(urlState.groupBy);
   const [page] = useState(urlState.page);
@@ -76,6 +91,38 @@ export default function Dashboard() {
     }
     return groupBy;
   }, [groupBy, filters.scanned_service_types]);
+
+  // Build red flag info per aggregation group (for accordion badges)
+  const redFlagGroupInfo = useMemo(() => {
+    if (rfContractMap.size === 0 || !aggregations) return {};
+    // We need to map group values to red flag counts and types
+    // This is a client-side enrichment - we count flags for contracts under each group
+    const info: Record<string, { count: number; types: { type: string; severity: string }[] }> = {};
+    // For now, build from the flags directly
+    const allFlags = Array.from(rfContractMap.values()).flat();
+    for (const flag of allFlags) {
+      // Determine which group this flag belongs to based on effectiveGroupBy
+      let groupKey = '';
+      if (effectiveGroupBy === 'supplier' || effectiveGroupBy === 'vendor') {
+        groupKey = flag.vendor;
+      } else if (effectiveGroupBy === 'buyer' || effectiveGroupBy === 'institution') {
+        groupKey = flag.institution;
+      } else if (effectiveGroupBy === 'category' || effectiveGroupBy === 'scanned_service_subtype') {
+        groupKey = flag.category;
+      } else if (effectiveGroupBy === 'award_type') {
+        groupKey = flag.award_type;
+      } else if (effectiveGroupBy === 'red_flag_type') {
+        groupKey = flag.red_flag_type;
+      }
+      if (!groupKey) continue;
+      if (!info[groupKey]) info[groupKey] = { count: 0, types: [] };
+      info[groupKey].count++;
+      if (!info[groupKey].types.find((t) => t.type === flag.red_flag_type)) {
+        info[groupKey].types.push({ type: flag.red_flag_name, severity: flag.severity });
+      }
+    }
+    return info;
+  }, [rfContractMap, aggregations, effectiveGroupBy]);
 
   // Sync state → URL
   useEffect(() => {
@@ -151,6 +198,10 @@ export default function Dashboard() {
         date_from: `${groupValue}-01`,
         date_to: `${groupValue}-${String(endDay).padStart(2, '0')}`,
       });
+      return;
+    }
+    if (groupBy === 'red_flag_type') {
+      setFilters({ ...filters, red_flag_types: [groupValue] });
     }
   }, [filters, groupBy, effectiveGroupBy, setFilters]);
 
@@ -178,6 +229,8 @@ export default function Dashboard() {
         scannedServiceSubtypeCounts={scannedServiceSubtypeCounts}
         awardTypes={distinctAwardTypes}
         optionsLoaded={optionsLoaded}
+        redFlagDatasetNames={rfDatasetNames}
+        redFlagTypes={rfFlagTypes}
       />
 
       {/* Summary strip */}
@@ -239,6 +292,7 @@ export default function Dashboard() {
       {aggregations && (
         <CategoryAccordion
           groups={aggregations.results}
+          redFlagInfo={redFlagGroupInfo}
           renderExpanded={(groupValue) => (
             <AccordionContracts
               filters={filters}

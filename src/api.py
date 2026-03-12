@@ -198,6 +198,12 @@ def parse_filters(
     text_search: Optional[str] = Query(
         None, description="Full-text search query"
     ),
+    red_flag_types: Optional[str] = Query(
+        None, description="Pipe-separated red flag types"
+    ),
+    red_flag_datasets: Optional[str] = Query(
+        None, description="Pipe-separated red flag dataset names"
+    ),
 ) -> FilterState:
     """Build a FilterState from query parameters.
 
@@ -234,6 +240,12 @@ def parse_filters(
             award_types.split("|") if award_types else None
         ),
         text_search=text_search,
+        red_flag_types=(
+            red_flag_types.split("|") if red_flag_types else None
+        ),
+        red_flag_datasets=(
+            red_flag_datasets.split("|") if red_flag_datasets else None
+        ),
     )
 
 
@@ -451,6 +463,36 @@ def get_tender(tender_id: str):
     if tender is None:
         raise HTTPException(status_code=404, detail=f"Tender {tender_id} not found")
     return tender
+
+
+# ── Endpoints — Red Flag Dataset Merge ───────────────────────────────
+
+
+@app.post("/api/red-flags/merge")
+def merge_red_flags(
+    body: dict,
+    store: DataStore = Depends(get_store),
+):
+    """
+    Merge a red flag dataset into the contracts store.
+
+    Accepts a red flag dataset JSON (same format as the uploaded files).
+    For each flag, the matching contract is duplicated with red flag
+    fields populated, so standard filtering/grouping/aggregation works.
+    """
+    merged = store.merge_red_flags(body)
+    return {"merged": merged, "dataset_name": body.get("dataset_name", "unknown")}
+
+
+@app.post("/api/red-flags/remove")
+def remove_red_flags(
+    body: dict,
+    store: DataStore = Depends(get_store),
+):
+    """Remove all merged entries for a given red flag dataset."""
+    name = body.get("dataset_name", "")
+    removed = store.remove_red_flag_dataset(name)
+    return {"removed": removed, "dataset_name": name}
 
 
 # ── Endpoints — Aggregations ────────────────────────────────────────

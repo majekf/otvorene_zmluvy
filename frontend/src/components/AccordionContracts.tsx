@@ -8,6 +8,9 @@
  * Props carry the parent page's filter state + the active group-by
  * field so the component can build a merged filter that narrows to
  * the specific group value.
+ *
+ * Red flag data is now merged into contracts on the backend, so
+ * red_flag_type grouping uses the same API flow as all other fields.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -69,6 +72,9 @@ function mergeGroupFilter(
       }
       break;
     }
+    case 'red_flag_type':
+      merged.red_flag_types = [value];
+      break;
   }
   return merged;
 }
@@ -138,6 +144,9 @@ export default function AccordionContracts({
     );
   }
 
+  // Show red flag column when any contract in the results has red flag data
+  const hasRedFlags = data.contracts.some((c) => c.red_flag_type);
+
   return (
     <div data-testid={`accordion-contracts-${groupValue}`}>
       <ContractsTable
@@ -145,6 +154,7 @@ export default function AccordionContracts({
         sort={sort}
         onSortChange={handleSortChange}
         onRowClick={handleRowClick}
+        showRedFlagColumn={hasRedFlags}
       />
       {data.total > pageSize && (
         <Pagination

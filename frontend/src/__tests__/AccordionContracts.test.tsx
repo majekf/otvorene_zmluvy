@@ -351,4 +351,9 @@ describe('mergeGroupFilter', () => {
     mergeGroupFilter(base, 'category', 'x');
     expect(base).toEqual({ text_search: 'test' });
   });
+
+  it('adds red_flag_types for groupBy=red_flag_type', () => {
+    const result = mergeGroupFilter({}, 'red_flag_type', 'new_vendor_large_contract');
+    expect(result.red_flag_types).toEqual(['new_vendor_large_contract']);
+  });
 });
