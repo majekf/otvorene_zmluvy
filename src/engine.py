@@ -241,7 +241,7 @@ class DataStore:
             return
 
         # For each contract, determine which datasets its vendor/institution
-        # appears in.
+        # appears in.  Also label non-flagged contracts as "no red flag".
         for c in self._contracts:
             associated: List[str] = []
             for ds in all_datasets:
@@ -260,6 +260,11 @@ class DataStore:
                 "red_flag_associated_datasets",
                 sorted(associated) if associated else None,
             )
+
+            # Contracts that are not direct flag entries get "no red flag"
+            if not c.red_flag_dataset and not c.red_flag_type:
+                object.__setattr__(c, "red_flag_type", "no red flag")
+                object.__setattr__(c, "red_flag_name", "no red flag")
 
     def _rebuild_indices(self) -> None:
         """Build lookup indices for frequently-filtered fields."""
