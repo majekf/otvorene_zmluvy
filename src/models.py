@@ -93,6 +93,14 @@ class Contract(BaseModel):
     red_flag_dataset: Optional[str] = Field(
         default=None, description="Name of the red flag dataset this flag came from"
     )
+    red_flag_associated_datasets: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "Dataset names where this contract's vendor or institution was flagged. "
+            "Set on ALL contracts (not just flagged ones) so RF-dataset filtering "
+            "returns every contract involving a flagged entity."
+        ),
+    )
 
     model_config = {"extra": "allow"}
 

@@ -190,6 +190,7 @@ class DataStore:
             merged_count += 1
 
         self._rebuild_indices()
+        self._compute_red_flag_associations()
         return merged_count
 
     def remove_red_flag_dataset(self, dataset_name: str) -> int:
@@ -206,7 +207,59 @@ class DataStore:
         removed = before - len(self._contracts)
         if removed > 0:
             self._rebuild_indices()
+        self._compute_red_flag_associations()
         return removed
+
+    # ── Red-flag association helper ──────────────────────────────────
+
+    def _compute_red_flag_associations(self) -> None:
+        """Mark every contract whose vendor or institution appears in any RF dataset.
+
+        After merge/remove, this walks all contracts and builds a
+        mapping of {dataset → flagged_vendors, flagged_institutions}.
+        Then every contract (including non-flagged ones) gets its
+        ``red_flag_associated_datasets`` set to the list of datasets
+        where its supplier or buyer was involved in at least one flag.
+        """
+        # Collect flagged entities per dataset
+        flagged_vendors: Dict[str, set] = defaultdict(set)
+        flagged_institutions: Dict[str, set] = defaultdict(set)
+
+        for c in self._contracts:
+            if c.red_flag_dataset:
+                if c.supplier:
+                    flagged_vendors[c.red_flag_dataset].add(c.supplier)
+                if c.buyer:
+                    flagged_institutions[c.red_flag_dataset].add(c.buyer)
+
+        all_datasets = set(flagged_vendors.keys()) | set(flagged_institutions.keys())
+
+        if not all_datasets:
+            # No flags at all – clear the helper field on every contract
+            for c in self._contracts:
+                object.__setattr__(c, "red_flag_associated_datasets", None)
+            return
+
+        # For each contract, determine which datasets its vendor/institution
+        # appears in.
+        for c in self._contracts:
+            associated: List[str] = []
+            for ds in all_datasets:
+                vendor_flagged = (
+                    c.supplier is not None
+                    and c.supplier in flagged_vendors.get(ds, set())
+                )
+                institution_flagged = (
+                    c.buyer is not None
+                    and c.buyer in flagged_institutions.get(ds, set())
+                )
+                if vendor_flagged or institution_flagged:
+                    associated.append(ds)
+            object.__setattr__(
+                c,
+                "red_flag_associated_datasets",
+                sorted(associated) if associated else None,
+            )
 
     def _rebuild_indices(self) -> None:
         """Build lookup indices for frequently-filtered fields."""
@@ -402,7 +455,11 @@ class DataStore:
 
         if filters.red_flag_datasets:
             ds_set = set(filters.red_flag_datasets)
-            result = [c for c in result if c.red_flag_dataset and c.red_flag_dataset in ds_set]
+            result = [
+                c for c in result
+                if c.red_flag_associated_datasets
+                and ds_set.intersection(c.red_flag_associated_datasets)
+            ]
 
         if filters.text_search:
             result = self._text_filter(result, filters.text_search)
