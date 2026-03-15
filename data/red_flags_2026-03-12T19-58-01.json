@@ -1,0 +1,66 @@
+{
+  "dataset_name": "2026-03-12T19-58-01",
+  "created_at": "2026-03-12T19:58:01.305Z",
+  "total_flags": 3,
+  "total_contracts_evaluated": 3,
+  "rules_used": [
+    {
+      "rule_id": "overnight_turnaround",
+      "rule_name": "Overnight Turnaround",
+      "severity_label": "moderate",
+      "params": {
+        "max_hours": 46
+      }
+    }
+  ],
+  "flags": [
+    {
+      "contract_id": "11730190",
+      "contract_title": "",
+      "institution": "Hlavné mesto SR Bratislava",
+      "vendor": "KOMUNÁLNA poisťovňa, a.s. Vienna Insurance Group",
+      "ico_buyer": null,
+      "ico_supplier": null,
+      "price_numeric_eur": null,
+      "date_published": "2025-12-11",
+      "category": "",
+      "award_type": "",
+      "red_flag_type": "overnight_turnaround",
+      "red_flag_name": "Overnight Turnaround",
+      "severity": "moderate",
+      "description": "Contract concluded on 2025-12-10 and published on 2025-12-11 (24.0h turnaround, limit 46h)"
+    },
+    {
+      "contract_id": "11730188",
+      "contract_title": "",
+      "institution": "Hlavné mesto SR Bratislava",
+      "vendor": "Odvoz a likvidácia odpadu a.s. v skratke: OLO a.s.",
+      "ico_buyer": null,
+      "ico_supplier": null,
+      "price_numeric_eur": null,
+      "date_published": "2025-12-11",
+      "category": "",
+      "award_type": "",
+      "red_flag_type": "overnight_turnaround",
+      "red_flag_name": "Overnight Turnaround",
+      "severity": "moderate",
+      "description": "Contract concluded on 2025-12-10 and published on 2025-12-11 (24.0h turnaround, limit 46h)"
+    },
+    {
+      "contract_id": "11476490",
+      "contract_title": "",
+      "institution": "Hlavné mesto SR Bratislava",
+      "vendor": "Slovenská inovačná a energetická agentúra",
+      "ico_buyer": null,
+      "ico_supplier": null,
+      "price_numeric_eur": null,
+      "date_published": "2025-10-22",
+      "category": "",
+      "award_type": "",
+      "red_flag_type": "overnight_turnaround",
+      "red_flag_name": "Overnight Turnaround",
+      "severity": "moderate",
+      "description": "Contract concluded on 2025-10-21 and published on 2025-10-22 (24.0h turnaround, limit 46h)"
+    }
+  ]
+}
