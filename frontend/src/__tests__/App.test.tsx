@@ -49,7 +49,7 @@ function renderApp(route: string) {
 describe('App routing', () => {
   it('renders header with GovLens branding', () => {
     renderApp('/');
-    expect(screen.getAllByText('GovLens').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Neuniknenam').length).toBeGreaterThanOrEqual(1);
   });
 
   it('routes / to Dashboard', () => {

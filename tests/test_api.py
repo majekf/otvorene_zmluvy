@@ -27,7 +27,7 @@ SMALL_RECORDS = [
         "supplier": "STRABAG s.r.o.",
         "price_numeric_eur": 1_000_000.0,
         "published_date": "2025-12-01",
-        "category": "construction",
+        "scanned_service_type": "construction",
         "award_type": "direct_award",
         "pdf_text_summary": "road repair summary",
         "contract_url": "https://www.crz.gov.sk/zmluva/1001/",
@@ -41,7 +41,7 @@ SMALL_RECORDS = [
         "supplier": "T-Systems Slovakia s.r.o.",
         "price_numeric_eur": 500_000.0,
         "published_date": "2025-12-15",
-        "category": "IT",
+        "scanned_service_type": "IT",
         "award_type": "open_tender",
         "pdf_text_summary": "IT system deployment",
         "contract_url": "https://www.crz.gov.sk/zmluva/1002/",
@@ -55,7 +55,7 @@ SMALL_RECORDS = [
         "supplier": "STRABAG s.r.o.",
         "price_numeric_eur": 200_000.0,
         "published_date": "2026-01-10",
-        "category": "supplies",
+        "scanned_service_type": "supplies",
         "award_type": "direct_award",
         "pdf_text_summary": "food supply for canteen",
         "contract_url": "https://www.crz.gov.sk/zmluva/1003/",
@@ -69,7 +69,7 @@ SMALL_RECORDS = [
         "supplier": "SecurCorp a.s.",
         "price_numeric_eur": 750_000.0,
         "published_date": "2026-01-20",
-        "category": "services",
+        "scanned_service_type": "services",
         "award_type": "open_tender",
         "pdf_text_summary": "security services contract",
         "contract_url": "https://www.crz.gov.sk/zmluva/1004/",
@@ -83,7 +83,7 @@ SMALL_RECORDS = [
         "supplier": "BuildCo s.r.o.",
         "price_numeric_eur": 300_000.0,
         "published_date": "2026-02-05",
-        "category": "construction",
+        "scanned_service_type": "construction",
         "award_type": "direct_award",
         "pdf_text_summary": "building maintenance",
         "contract_url": "https://www.crz.gov.sk/zmluva/1005/",
@@ -670,7 +670,7 @@ class TestContractsSort:
             "supplier": "Vendor X",
             "price_numeric_eur": 1_000_000.0,
             "published_date": "2025-03-01",
-            "category": "construction",
+            "scanned_service_type": "construction",
             "award_type": "open_tender",
         },
         {
@@ -683,7 +683,7 @@ class TestContractsSort:
             "supplier": "Vendor Y",
             "price_numeric_eur": 500_000.0,
             "published_date": "2025-01-01",
-            "category": "IT",
+            "scanned_service_type": "IT",
             "award_type": "direct_award",
         },
         {
@@ -696,7 +696,7 @@ class TestContractsSort:
             "supplier": "Vendor Z",
             "price_numeric_eur": 500_000.0,
             "published_date": "2025-06-01",
-            "category": "services",
+            "scanned_service_type": "services",
             "award_type": "open_tender",
         },
     ]
@@ -1065,13 +1065,13 @@ class TestBenchmarkWithFilters:
         assert ke["contract_count"] == 2
 
     def test_benchmark_compare_with_category_filter(self, client):
-        """Benchmark compare respects category filter."""
+        """Benchmark compare respects scanned_service_types filter."""
         r = client.get(
             "/api/benchmark/compare",
             params={
-                "institutions": "Mesto Bratislava|Mesto Košice",
+                "institutions": "Mesto Bratislava|Mesto Ko\u0161ice",
                 "metrics": "total_spend",
-                "categories": "construction",
+                "scanned_service_types": "construction",
             },
         )
         assert r.status_code == 200
@@ -1098,13 +1098,13 @@ class TestBenchmarkWithFilters:
         assert ba["total_spend"] == 1_500_000
 
     def test_benchmark_endpoint_with_category_filter(self, client):
-        """Single-metric benchmark endpoint respects category filter."""
+        """Single-metric benchmark endpoint respects scanned_service_types filter."""
         r = client.get(
             "/api/benchmark",
             params={
-                "institutions": "Mesto Bratislava|Mesto Košice",
+                "institutions": "Mesto Bratislava|Mesto Ko\u0161ice",
                 "metric": "total_spend",
-                "categories": "construction",
+                "scanned_service_types": "construction",
             },
         )
         assert r.status_code == 200
@@ -1131,13 +1131,13 @@ class TestBenchmarkWithFilters:
         assert "Mesto Bratislava" not in data["peers"]
 
     def test_benchmark_peers_with_category_filter(self, client):
-        """Peer group respects category filter."""
+        """Peer group respects scanned_service_types filter."""
         r = client.get(
             "/api/benchmark/peers",
             params={
                 "institution": "Mesto Bratislava",
                 "min_contracts": 1,
-                "categories": "construction",
+                "scanned_service_types": "construction",
             },
         )
         assert r.status_code == 200

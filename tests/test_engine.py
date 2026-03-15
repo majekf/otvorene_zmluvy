@@ -38,7 +38,7 @@ def small_records():
             "supplier": "STRABAG s.r.o.",
             "price_numeric_eur": 1_000_000.0,
             "published_date": "2025-12-01",
-            "category": "construction",
+            "scanned_service_type": "construction",
             "award_type": "direct_award",
             "pdf_text_summary": "road repair summary",
             "ico_buyer": "00001001",
@@ -50,7 +50,7 @@ def small_records():
             "supplier": "T-Systems Slovakia s.r.o.",
             "price_numeric_eur": 500_000.0,
             "published_date": "2025-12-15",
-            "category": "IT",
+            "scanned_service_type": "IT",
             "award_type": "open_tender",
             "pdf_text_summary": "IT system deployment",
             "ico_buyer": "00001001",
@@ -62,7 +62,7 @@ def small_records():
             "supplier": "STRABAG s.r.o.",
             "price_numeric_eur": 200_000.0,
             "published_date": "2026-01-10",
-            "category": "supplies",
+            "scanned_service_type": "supplies",
             "award_type": "direct_award",
             "pdf_text_summary": "food supply for canteen",
             "ico_buyer": "00001002",
@@ -74,7 +74,7 @@ def small_records():
             "supplier": "SecurCorp a.s.",
             "price_numeric_eur": 750_000.0,
             "published_date": "2026-01-20",
-            "category": "services",
+            "scanned_service_type": "services",
             "award_type": "open_tender",
             "pdf_text_summary": "security services contract",
             "ico_buyer": "00001003",
@@ -86,7 +86,7 @@ def small_records():
             "supplier": "BuildCo s.r.o.",
             "price_numeric_eur": 300_000.0,
             "published_date": "2026-02-05",
-            "category": "construction",
+            "scanned_service_type": "construction",
             "award_type": "direct_award",
             "pdf_text_summary": "building maintenance",
             "ico_buyer": "00001002",
@@ -215,11 +215,11 @@ class TestFilter:
         assert len(result) == 3  # 1M, 500k, 750k
 
     def test_filter_by_category(self, small_store: DataStore):
-        """Filters on category field."""
-        f = FilterState(categories=["construction"])
+        """Filters on scanned_service_type field (canonical category since fixture migration)."""
+        f = FilterState(scanned_service_types=["construction"])
         result = small_store.filter(f)
         assert len(result) == 2
-        assert all(c.category == "construction" for c in result)
+        assert all(getattr(c, "scanned_service_type", None) == "construction" for c in result)
 
     def test_filter_by_vendor(self, small_store: DataStore):
         """Filter by vendor (supplier)."""
@@ -337,10 +337,10 @@ class TestGroupBy:
         assert set(groups.keys()) == {"construction", "IT"}
 
     def test_group_by_sample_data(self, store: DataStore):
-        """Sample data all category='not_decided' → single group."""
+        """Sample data has no scanned_service_type → all fall into 'Nezaradené' group."""
         groups = store.group_by("category")
-        assert "not_decided" in groups
-        assert len(groups["not_decided"]) == 29
+        assert "Nezaraden\u00e9" in groups
+        assert len(groups["Nezaraden\u00e9"]) == 29
 
 
 # ── 5. Aggregation ──────────────────────────────────────────────────
@@ -697,7 +697,7 @@ def sort_store() -> DataStore:
             "supplier": "Vendor C",
             "price_numeric_eur": 500_000.0,
             "published_date": "2025-01-15",
-            "category": "construction",
+            "scanned_service_type": "construction",
             "scanned_suggested_title": "Road maintenance",
             "scanned_service_type": "construction_services",
             "scanned_service_subtype": "bridges",
@@ -708,7 +708,7 @@ def sort_store() -> DataStore:
             "supplier": "vendor a",
             "price_numeric_eur": 500_000.0,  # same price as Alpha
             "published_date": "2025-06-01",   # later date
-            "category": "IT",
+            "scanned_service_type": "IT",
             "scanned_suggested_title": "Airport support",
             "scanned_service_type": "air_transport",
             "scanned_service_subtype": "airfield",
@@ -719,7 +719,7 @@ def sort_store() -> DataStore:
             "supplier": "Vendor D",
             "price_numeric_eur": 200_000.0,
             "published_date": "2025-03-20",
-            "category": "services",
+            "scanned_service_type": "services",
             "scanned_suggested_title": "Waste collection",
             "scanned_service_type": "waste_services",
             "scanned_service_subtype": "bins",
@@ -730,7 +730,7 @@ def sort_store() -> DataStore:
             "supplier": "Vendor B",
             "price_numeric_eur": 800_000.0,
             "published_date": "2025-09-10",
-            "category": "supplies",
+            "scanned_service_type": "supplies",
             "scanned_suggested_title": "Zoo cleaning",
             "scanned_service_type": "cleaning_services",
             "scanned_service_subtype": "zebra",
@@ -741,7 +741,7 @@ def sort_store() -> DataStore:
             "supplier": "Vendor E",
             "price_numeric_eur": None,          # None price
             "published_date": "2025-07-01",
-            "category": "construction",
+            "scanned_service_type": "construction",
             "scanned_suggested_title": None,
             "scanned_service_type": None,
             "scanned_service_subtype": None,

@@ -175,8 +175,17 @@ def chat_store():
 
 
 @pytest.fixture
-def client(chat_store):
-    """FastAPI test client with dependency override."""
+def client(chat_store, monkeypatch):
+    """FastAPI test client with dependency override.
+
+    Patches _llm_client to MockLLMClient so the WS handler never hits a real
+    OpenAI endpoint, and sets app.state.store directly because the WebSocket
+    endpoint reads it bypassing FastAPI's dependency-injection mechanism.
+    """
+    import src.api as api_module
+
+    monkeypatch.setattr(api_module, "_llm_client", MockLLMClient())
+    app.state.store = chat_store
     app.dependency_overrides[get_store] = lambda: chat_store
     with TestClient(app) as c:
         yield c
