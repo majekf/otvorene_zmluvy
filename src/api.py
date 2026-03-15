@@ -204,6 +204,18 @@ def parse_filters(
     red_flag_datasets: Optional[str] = Query(
         None, description="Pipe-separated red flag dataset names"
     ),
+    institution_flag_count_min: Optional[int] = Query(
+        None, description="Minimum red flag count for institution"
+    ),
+    institution_flag_count_max: Optional[int] = Query(
+        None, description="Maximum red flag count for institution"
+    ),
+    vendor_flag_count_min: Optional[int] = Query(
+        None, description="Minimum red flag count for vendor"
+    ),
+    vendor_flag_count_max: Optional[int] = Query(
+        None, description="Maximum red flag count for vendor"
+    ),
 ) -> FilterState:
     """Build a FilterState from query parameters.
 
@@ -246,6 +258,10 @@ def parse_filters(
         red_flag_datasets=(
             red_flag_datasets.split("|") if red_flag_datasets else None
         ),
+        institution_flag_count_min=institution_flag_count_min,
+        institution_flag_count_max=institution_flag_count_max,
+        vendor_flag_count_min=vendor_flag_count_min,
+        vendor_flag_count_max=vendor_flag_count_max,
     )
 
 

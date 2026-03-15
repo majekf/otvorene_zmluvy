@@ -54,6 +54,10 @@ function filterParams(filters: FilterState): Record<string, string> {
   if (filters.text_search) p.text_search = filters.text_search;
   if (filters.red_flag_types?.length) p.red_flag_types = filters.red_flag_types.join('|');
   if (filters.red_flag_datasets?.length) p.red_flag_datasets = filters.red_flag_datasets.join('|');
+  if (filters.institution_flag_count_min !== undefined) p.institution_flag_count_min = String(filters.institution_flag_count_min);
+  if (filters.institution_flag_count_max !== undefined) p.institution_flag_count_max = String(filters.institution_flag_count_max);
+  if (filters.vendor_flag_count_min !== undefined) p.vendor_flag_count_min = String(filters.vendor_flag_count_min);
+  if (filters.vendor_flag_count_max !== undefined) p.vendor_flag_count_max = String(filters.vendor_flag_count_max);
   return p;
 }
 

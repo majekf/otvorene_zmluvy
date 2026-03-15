@@ -178,6 +178,18 @@ class FilterState(BaseModel):
     red_flag_datasets: Optional[List[str]] = Field(
         default=None, description="Selected red flag dataset name(s) to filter by"
     )
+    institution_flag_count_min: Optional[int] = Field(
+        default=None, description="Minimum number of red flags for a contract's institution"
+    )
+    institution_flag_count_max: Optional[int] = Field(
+        default=None, description="Maximum number of red flags for a contract's institution"
+    )
+    vendor_flag_count_min: Optional[int] = Field(
+        default=None, description="Minimum number of red flags for a contract's vendor"
+    )
+    vendor_flag_count_max: Optional[int] = Field(
+        default=None, description="Maximum number of red flags for a contract's vendor"
+    )
 
 
 class AggregationResult(BaseModel):

@@ -466,6 +466,49 @@ class DataStore:
                 and ds_set.intersection(c.red_flag_associated_datasets)
             ]
 
+        # ── Flag-count filters ───────────────────────────────────────
+        if (
+            filters.vendor_flag_count_min is not None
+            or filters.vendor_flag_count_max is not None
+            or filters.institution_flag_count_min is not None
+            or filters.institution_flag_count_max is not None
+        ):
+            # Build flag counts from ALL contracts (not just the current
+            # result set) so numbers stay stable regardless of other filters.
+            vendor_counts: Dict[str, int] = defaultdict(int)
+            institution_counts: Dict[str, int] = defaultdict(int)
+            for c in self._contracts:
+                if c.red_flag_dataset:          # only actual flag entries
+                    if c.supplier:
+                        vendor_counts[c.supplier] += 1
+                    if c.buyer:
+                        institution_counts[c.buyer] += 1
+
+            if filters.vendor_flag_count_min is not None:
+                vmin = filters.vendor_flag_count_min
+                result = [
+                    c for c in result
+                    if vendor_counts.get(c.supplier or "", 0) >= vmin
+                ]
+            if filters.vendor_flag_count_max is not None:
+                vmax = filters.vendor_flag_count_max
+                result = [
+                    c for c in result
+                    if vendor_counts.get(c.supplier or "", 0) <= vmax
+                ]
+            if filters.institution_flag_count_min is not None:
+                imin = filters.institution_flag_count_min
+                result = [
+                    c for c in result
+                    if institution_counts.get(c.buyer or "", 0) >= imin
+                ]
+            if filters.institution_flag_count_max is not None:
+                imax = filters.institution_flag_count_max
+                result = [
+                    c for c in result
+                    if institution_counts.get(c.buyer or "", 0) <= imax
+                ]
+
         if filters.text_search:
             result = self._text_filter(result, filters.text_search)
 
