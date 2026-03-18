@@ -1,3 +1,13 @@
+# Important commands:
+```bash
+uvicorn src.api:app --reload
+cd frontend && npm run dev
+
+pytest tests/ -v
+cd frontend && npm test
+cd frontend && npx vitest
+```
+
 # CRZ (Central Register of Contracts) Web Scraper
 
 A robust Python scraper for the Slovak government contracts website (https://www.crz.gov.sk/).
