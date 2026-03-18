@@ -77,6 +77,31 @@ class Contract(BaseModel):
         description="Award type: tendered | direct_award | negotiated | unknown",
     )
 
+    # ── Red flag fields (merged from red-flag datasets) ──────────────
+    red_flag_type: Optional[str] = Field(
+        default=None, description="Red flag type identifier (e.g. 'new_vendor_large_contract')"
+    )
+    red_flag_name: Optional[str] = Field(
+        default=None, description="Red flag display name (e.g. 'New-Vendor-Large-Contract')"
+    )
+    red_flag_severity: Optional[str] = Field(
+        default=None, description="Red flag severity: mild | moderate | severe"
+    )
+    red_flag_description: Optional[str] = Field(
+        default=None, description="Red flag description text"
+    )
+    red_flag_dataset: Optional[str] = Field(
+        default=None, description="Name of the red flag dataset this flag came from"
+    )
+    red_flag_associated_datasets: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "Dataset names where this contract's vendor or institution was flagged. "
+            "Set on ALL contracts (not just flagged ones) so RF-dataset filtering "
+            "returns every contract involving a flagged entity."
+        ),
+    )
+
     model_config = {"extra": "allow"}
 
 
@@ -146,6 +171,24 @@ class FilterState(BaseModel):
     )
     text_search: Optional[str] = Field(
         default=None, description="Free-text search over title and summary"
+    )
+    red_flag_types: Optional[List[str]] = Field(
+        default=None, description="Selected red flag type(s) to filter by"
+    )
+    red_flag_datasets: Optional[List[str]] = Field(
+        default=None, description="Selected red flag dataset name(s) to filter by"
+    )
+    institution_flag_count_min: Optional[int] = Field(
+        default=None, description="Minimum number of red flags for a contract's institution"
+    )
+    institution_flag_count_max: Optional[int] = Field(
+        default=None, description="Maximum number of red flags for a contract's institution"
+    )
+    vendor_flag_count_min: Optional[int] = Field(
+        default=None, description="Minimum number of red flags for a contract's vendor"
+    )
+    vendor_flag_count_max: Optional[int] = Field(
+        default=None, description="Maximum number of red flags for a contract's vendor"
     )
 
 

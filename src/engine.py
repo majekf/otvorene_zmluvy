@@ -35,6 +35,9 @@ SORTABLE_FIELDS: frozenset = frozenset({
     "date_published",
     "date_concluded",
     "date_effective",
+    "red_flag_type",
+    "red_flag_name",
+    "red_flag_severity",
 })
 
 
@@ -109,6 +112,159 @@ class DataStore:
         self._contracts = [Contract(**r) for r in records]
         self._rebuild_indices()
         return len(self._contracts)
+
+    def merge_red_flags(self, dataset: dict) -> int:
+        """
+        Merge red flag occurrences into the contracts list.
+
+        For each flag in the dataset, find the matching contract by
+        contract_id and create a copy with red flag fields populated.
+        A single contract may appear multiple times if it has multiple
+        flags. Contracts without flags are kept unchanged.
+
+        Also enriches flag data with contract details (price, dates, etc.)
+        when the flag itself has empty/null values for those fields.
+
+        Returns:
+            Number of red flag entries merged.
+        """
+        flags = dataset.get("flags", [])
+        dataset_name = dataset.get("dataset_name", "unknown")
+        if not flags:
+            return 0
+
+        # Build lookup: contract_id → contract
+        contract_map: Dict[str, Contract] = {}
+        for c in self._contracts:
+            if c.contract_id:
+                contract_map[c.contract_id] = c
+
+        # First, remove any previously merged flags from this dataset
+        self._contracts = [
+            c for c in self._contracts if c.red_flag_dataset != dataset_name
+        ]
+
+        merged_count = 0
+        for flag in flags:
+            cid = flag.get("contract_id")
+            base = contract_map.get(cid)
+            if base:
+                # Create a copy of the existing contract with red flag fields added
+                data = base.model_dump()
+            else:
+                # Contract not in our data — create a minimal entry from the flag
+                data = {
+                    "contract_id": cid,
+                    "contract_title": flag.get("contract_title", ""),
+                    "buyer": flag.get("institution", ""),
+                    "supplier": flag.get("vendor", ""),
+                    "price_numeric_eur": flag.get("price_numeric_eur"),
+                    "ico_buyer": flag.get("ico_buyer"),
+                    "ico_supplier": flag.get("ico_supplier"),
+                    "date_published": flag.get("date_published"),
+                    "published_date": flag.get("date_published"),
+                    "category": flag.get("category", "not_decided"),
+                    "award_type": flag.get("award_type", "unknown"),
+                }
+
+            # Overlay red flag fields
+            data["red_flag_type"] = flag.get("red_flag_type")
+            data["red_flag_name"] = flag.get("red_flag_name")
+            data["red_flag_severity"] = flag.get("severity")
+            data["red_flag_description"] = flag.get("description")
+            data["red_flag_dataset"] = dataset_name
+
+            # Enrich flag with contract details if the flag has empty values
+            if base:
+                if not flag.get("institution") and base.buyer:
+                    data["buyer"] = base.buyer
+                if not flag.get("vendor") and base.supplier:
+                    data["supplier"] = base.supplier
+                if flag.get("price_numeric_eur") is None and base.price_numeric_eur is not None:
+                    data["price_numeric_eur"] = base.price_numeric_eur
+                if not flag.get("date_published") and base.published_date:
+                    data["date_published"] = base.published_date
+                    data["published_date"] = base.published_date
+
+            self._contracts.append(Contract(**data))
+            merged_count += 1
+
+        self._rebuild_indices()
+        self._compute_red_flag_associations()
+        return merged_count
+
+    def remove_red_flag_dataset(self, dataset_name: str) -> int:
+        """
+        Remove all contracts that were merged from a specific red flag dataset.
+
+        Returns:
+            Number of entries removed.
+        """
+        before = len(self._contracts)
+        self._contracts = [
+            c for c in self._contracts if c.red_flag_dataset != dataset_name
+        ]
+        removed = before - len(self._contracts)
+        if removed > 0:
+            self._rebuild_indices()
+        self._compute_red_flag_associations()
+        return removed
+
+    # ── Red-flag association helper ──────────────────────────────────
+
+    def _compute_red_flag_associations(self) -> None:
+        """Mark every contract whose vendor or institution appears in any RF dataset.
+
+        After merge/remove, this walks all contracts and builds a
+        mapping of {dataset → flagged_vendors, flagged_institutions}.
+        Then every contract (including non-flagged ones) gets its
+        ``red_flag_associated_datasets`` set to the list of datasets
+        where its supplier or buyer was involved in at least one flag.
+        """
+        # Collect flagged entities per dataset
+        flagged_vendors: Dict[str, set] = defaultdict(set)
+        flagged_institutions: Dict[str, set] = defaultdict(set)
+
+        for c in self._contracts:
+            if c.red_flag_dataset:
+                if c.supplier:
+                    flagged_vendors[c.red_flag_dataset].add(c.supplier)
+                if c.buyer:
+                    flagged_institutions[c.red_flag_dataset].add(c.buyer)
+
+        all_datasets = set(flagged_vendors.keys()) | set(flagged_institutions.keys())
+
+        if not all_datasets:
+            # No flags at all – clear the helper field on every contract
+            for c in self._contracts:
+                object.__setattr__(c, "red_flag_associated_datasets", None)
+            return
+
+        # For each contract, determine which datasets its vendor/institution
+        # appears in.  Also label non-flagged contracts as "no red flag".
+        for c in self._contracts:
+            associated: List[str] = []
+            for ds in all_datasets:
+                vendor_flagged = (
+                    c.supplier is not None
+                    and c.supplier in flagged_vendors.get(ds, set())
+                )
+                institution_flagged = (
+                    c.buyer is not None
+                    and c.buyer in flagged_institutions.get(ds, set())
+                )
+                if vendor_flagged or institution_flagged:
+                    associated.append(ds)
+            object.__setattr__(
+                c,
+                "red_flag_associated_datasets",
+                sorted(associated) if associated else None,
+            )
+
+            # Contracts that are not direct flag entries get "no red flag"
+            if not c.red_flag_dataset and not c.red_flag_type:
+                object.__setattr__(c, "red_flag_type", "no red flag")
+                object.__setattr__(c, "red_flag_name", "no red flag")
 
     def _rebuild_indices(self) -> None:
         """Build lookup indices for frequently-filtered fields."""
@@ -294,6 +450,65 @@ class DataStore:
             at_set = set(filters.award_types)
             result = [c for c in result if c.award_type in at_set]
 
+        if filters.red_flag_types:
+            rf_set = set(filters.red_flag_types)
+            result = [
+                c for c in result
+                if (c.red_flag_type and c.red_flag_type in rf_set)
+                or (c.red_flag_name and c.red_flag_name in rf_set)
+            ]
+
+        if filters.red_flag_datasets:
+            ds_set = set(filters.red_flag_datasets)
+            result = [
+                c for c in result
+                if c.red_flag_associated_datasets
+                and ds_set.intersection(c.red_flag_associated_datasets)
+            ]
+
+        # ── Flag-count filters ───────────────────────────────────────
+        if (
+            filters.vendor_flag_count_min is not None
+            or filters.vendor_flag_count_max is not None
+            or filters.institution_flag_count_min is not None
+            or filters.institution_flag_count_max is not None
+        ):
+            # Build flag counts from ALL contracts (not just the current
+            # result set) so numbers stay stable regardless of other filters.
+            vendor_counts: Dict[str, int] = defaultdict(int)
+            institution_counts: Dict[str, int] = defaultdict(int)
+            for c in self._contracts:
+                if c.red_flag_dataset:          # only actual flag entries
+                    if c.supplier:
+                        vendor_counts[c.supplier] += 1
+                    if c.buyer:
+                        institution_counts[c.buyer] += 1
+
+            if filters.vendor_flag_count_min is not None:
+                vmin = filters.vendor_flag_count_min
+                result = [
+                    c for c in result
+                    if vendor_counts.get(c.supplier or "", 0) >= vmin
+                ]
+            if filters.vendor_flag_count_max is not None:
+                vmax = filters.vendor_flag_count_max
+                result = [
+                    c for c in result
+                    if vendor_counts.get(c.supplier or "", 0) <= vmax
+                ]
+            if filters.institution_flag_count_min is not None:
+                imin = filters.institution_flag_count_min
+                result = [
+                    c for c in result
+                    if institution_counts.get(c.buyer or "", 0) >= imin
+                ]
+            if filters.institution_flag_count_max is not None:
+                imax = filters.institution_flag_count_max
+                result = [
+                    c for c in result
+                    if institution_counts.get(c.buyer or "", 0) <= imax
+                ]
+
         if filters.text_search:
             result = self._text_filter(result, filters.text_search)
 
@@ -369,6 +584,8 @@ class DataStore:
             return contract.award_type
         elif field == "published_year":
             return contract.published_year
+        elif field == "red_flag_type":
+            return contract.red_flag_name or contract.red_flag_type
         else:
             # Try generic attribute access
             val = getattr(contract, field, None)

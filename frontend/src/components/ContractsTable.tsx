@@ -19,6 +19,8 @@ interface ContractsTableProps {
   onRowClick?: (contractId: string) => void;
   contractSeverities?: Record<string, number>;
   variant?: 'default' | 'all-contracts';
+  /** When true, show a "Red Flag Type" column using _red_flag_type on contract objects. */
+  showRedFlagColumn?: boolean;
 }
 
 export interface ColumnDef {
@@ -105,6 +107,23 @@ export const TABLE_COLUMNS: ColumnDef[] = [
   },
 ];
 
+/** Extra column shown when red flag data is present. */
+export const RED_FLAG_COLUMN: ColumnDef = {
+  key: 'red_flag_name',
+  label: 'Red Flag Type',
+  sortable: true,
+  className: 'w-[16%] truncate',
+  render: (c) => {
+    const flagName = c.red_flag_name;
+    const desc = c.red_flag_description;
+    return flagName ? (
+      <span className="inline-flex items-center gap-1 text-orange-700 bg-orange-50 px-2 py-0.5 rounded-full text-xs font-medium" title={desc || ''}>
+        🚩 {flagName}
+      </span>
+    ) : '—';
+  },
+};
+
 function findSortIndex(sort: SortSpec, field: string): number {
   return sort.findIndex(([f]) => f === field);
 }
@@ -115,8 +134,8 @@ function directionArrow(dir: string): string {
 
 const PRIORITY_BADGES = ['①', '②', '③'];
 
-export default function ContractsTable({ contracts, sort, onSortChange, onRowClick, contractSeverities, variant = 'default' }: ContractsTableProps) {
-  const columns = TABLE_COLUMNS;
+export default function ContractsTable({ contracts, sort, onSortChange, onRowClick, contractSeverities, variant = 'default', showRedFlagColumn = false }: ContractsTableProps) {
+  const columns = showRedFlagColumn ? [...TABLE_COLUMNS, RED_FLAG_COLUMN] : TABLE_COLUMNS;
 
   const handleHeaderClick = useCallback(
     (field: string, e: React.MouseEvent | React.KeyboardEvent) => {

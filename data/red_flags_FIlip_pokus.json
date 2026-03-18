@@ -1,0 +1,111 @@
+{
+  "dataset_name": "FIlip_pokus",
+  "created_at": "2026-03-11T07:28:45.821Z",
+  "total_flags": 3,
+  "total_contracts_evaluated": 6,
+  "rules_used": [
+    {
+      "rule_id": "threshold_proximity",
+      "rule_name": "Threshold Proximity",
+      "severity_label": "moderate",
+      "params": {
+        "threshold_eur": 100000,
+        "proximity_pct": 10
+      }
+    },
+    {
+      "rule_id": "vendor_concentration",
+      "rule_name": "Vendor Concentration",
+      "severity_label": "moderate",
+      "params": {
+        "top_n": 1,
+        "max_share_pct": 60
+      }
+    },
+    {
+      "rule_id": "fragmentation",
+      "rule_name": "Fragmentation",
+      "severity_label": "moderate",
+      "params": {
+        "min_contracts": 3,
+        "max_value_eur": 50000
+      }
+    },
+    {
+      "rule_id": "overnight_turnaround",
+      "rule_name": "Overnight Turnaround",
+      "severity_label": "moderate",
+      "params": {
+        "max_hours": 24
+      }
+    },
+    {
+      "rule_id": "new_vendor_large_contract",
+      "rule_name": "New-Vendor-Large-Contract",
+      "severity_label": "moderate",
+      "params": {
+        "min_value_eur": 100000
+      }
+    },
+    {
+      "rule_id": "round_number_clustering",
+      "rule_name": "Round-Number Clustering",
+      "severity_label": "moderate",
+      "params": {
+        "round_modulus": 1000,
+        "min_round_pct": 60,
+        "min_contracts": 5
+      }
+    }
+  ],
+  "flags": [
+    {
+      "contract_id": "11921148",
+      "contract_title": "",
+      "institution": "Automobilové opravovne Ministerstva vnútra SR, a.s.",
+      "vendor": "Rosenbauer Polska Spolka z ograniezona odpowiedzialnoscia",
+      "ico_buyer": null,
+      "ico_supplier": null,
+      "price_numeric_eur": null,
+      "date_published": null,
+      "category": "",
+      "award_type": "",
+      "red_flag_type": "new_vendor_large_contract",
+      "red_flag_name": "New-Vendor-Large-Contract",
+      "severity": "moderate",
+      "description": "Vendor 'Rosenbauer Polska Spolka z ograniezona odpowiedzialnoscia' first appeared with a 1,012,054.45 € contract (threshold 100,000 €)"
+    },
+    {
+      "contract_id": "11864994",
+      "contract_title": "",
+      "institution": "Automobilové opravovne Ministerstva vnútra SR, a.s.",
+      "vendor": "TECHNOMAX s.r.o.",
+      "ico_buyer": null,
+      "ico_supplier": null,
+      "price_numeric_eur": null,
+      "date_published": null,
+      "category": "",
+      "award_type": "",
+      "red_flag_type": "new_vendor_large_contract",
+      "red_flag_name": "New-Vendor-Large-Contract",
+      "severity": "moderate",
+      "description": "Vendor 'TECHNOMAX s.r.o.' first appeared with a 1,593,946.04 € contract (threshold 100,000 €)"
+    },
+    {
+      "contract_id": "11384434",
+      "contract_title": "",
+      "institution": "Automobilové opravovne Ministerstva vnútra SR, a.s.",
+      "vendor": "Slovenská sporiteľňa, a.s.",
+      "ico_buyer": null,
+      "ico_supplier": null,
+      "price_numeric_eur": null,
+      "date_published": null,
+      "category": "",
+      "award_type": "",
+      "red_flag_type": "new_vendor_large_contract",
+      "red_flag_name": "New-Vendor-Large-Contract",
+      "severity": "moderate",
+      "description": "Vendor 'Slovenská sporiteľňa, a.s.' first appeared with a 2,500,000.00 € contract (threshold 100,000 €)"
+    }
+  ]
+}

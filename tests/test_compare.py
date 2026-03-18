@@ -21,7 +21,7 @@ CONTRACT_RECORDS = [
         "supplier": "STRABAG s.r.o.",
         "price_numeric_eur": 1_000_000.0,
         "published_date": "2025-12-01",
-        "category": "construction",
+        "scanned_service_type": "construction",
         "award_type": "direct_award",
         "ico_buyer": "00001001",
         "ico_supplier": "00002001",
@@ -33,7 +33,7 @@ CONTRACT_RECORDS = [
         "supplier": "T-Systems Slovakia s.r.o.",
         "price_numeric_eur": 500_000.0,
         "published_date": "2025-12-15",
-        "category": "IT",
+        "scanned_service_type": "IT",
         "award_type": "open_tender",
         "ico_buyer": "00001001",
         "ico_supplier": "00002002",
@@ -45,7 +45,7 @@ CONTRACT_RECORDS = [
         "supplier": "FoodCorp s.r.o.",
         "price_numeric_eur": 200_000.0,
         "published_date": "2026-01-10",
-        "category": "construction",
+        "scanned_service_type": "construction",
         "award_type": "direct_award",
         "ico_buyer": "00001002",
         "ico_supplier": "00002003",
@@ -61,7 +61,7 @@ SUBCONTRACTOR_RECORDS = [
         "supplier": "SubCompany A s.r.o.",  # Already remapped
         "price_numeric_eur": 600_000.0,
         "published_date": "2025-12-01",
-        "category": "construction",
+        "scanned_service_type": "construction",
         "award_type": "direct_award",
         "ico_buyer": "00001001",
         "ico_supplier": "00003001",
@@ -73,7 +73,7 @@ SUBCONTRACTOR_RECORDS = [
         "supplier": "SubCompany B s.r.o.",  # Already remapped
         "price_numeric_eur": 300_000.0,
         "published_date": "2025-12-15",
-        "category": "IT",
+        "scanned_service_type": "IT",
         "award_type": "open_tender",
         "ico_buyer": "00001001",
         "ico_supplier": "00003002",
@@ -190,7 +190,7 @@ class TestCompareAggregations:
 
     def test_filter_pass_through(self, client_with_sub):
         """Filters should apply to both stores."""
-        r = client_with_sub.get("/api/compare/aggregations?categories=IT")
+        r = client_with_sub.get("/api/compare/aggregations?scanned_service_types=IT")
         data = r.json()
         cs = data["contracts_summary"]
         ss = data["subcontractors_summary"]
@@ -269,7 +269,7 @@ class TestSubStoreDataTransformation:
                 "ico_subcontractor": "SUB_ICO",
                 "price_numeric_eur": 100_000.0,
                 "published_date": "2025-06-01",
-                "category": "construction",
+                "scanned_service_type": "construction",
             }
         ]
         # Apply the same transformation as in lifespan
@@ -299,7 +299,7 @@ class TestSubStoreDataTransformation:
                 "ico_subcontractor": "SUB_ICO",
                 "price_numeric_eur": 250_000.0,
                 "published_date": "2025-07-01",
-                "category": "IT",
+                "scanned_service_type": "IT",
             }
         ]
         for record in raw_records:
@@ -313,7 +313,7 @@ class TestSubStoreDataTransformation:
         contract = ds.contracts[0]
         assert contract.buyer == "Test Buyer"
         assert contract.price_numeric_eur == 250_000.0
-        assert contract.category == "IT"
+        assert getattr(contract, "scanned_service_type", None) == "IT"
 
     def test_engine_aggregation_uses_remapped_vendor(self):
         """Aggregation by supplier should use the remapped subcontractor name."""
@@ -325,7 +325,7 @@ class TestSubStoreDataTransformation:
                 "ico_supplier": "ICO_A",
                 "price_numeric_eur": 100_000.0,
                 "published_date": "2025-06-01",
-                "category": "construction",
+                "scanned_service_type": "construction",
             },
             {
                 "contract_id": "X4",
@@ -334,7 +334,7 @@ class TestSubStoreDataTransformation:
                 "ico_supplier": "ICO_A",
                 "price_numeric_eur": 200_000.0,
                 "published_date": "2025-07-01",
-                "category": "construction",
+                "scanned_service_type": "construction",
             },
             {
                 "contract_id": "X5",
@@ -343,7 +343,7 @@ class TestSubStoreDataTransformation:
                 "ico_supplier": "ICO_B",
                 "price_numeric_eur": 50_000.0,
                 "published_date": "2025-08-01",
-                "category": "IT",
+                "scanned_service_type": "IT",
             },
         ]
         ds = DataStore()

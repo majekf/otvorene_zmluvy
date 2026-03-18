@@ -38,7 +38,7 @@ def small_records():
             "supplier": "STRABAG s.r.o.",
             "price_numeric_eur": 1_000_000.0,
             "published_date": "2025-12-01",
-            "category": "construction",
+            "scanned_service_type": "construction",
             "award_type": "direct_award",
             "pdf_text_summary": "road repair summary",
             "ico_buyer": "00001001",
@@ -50,7 +50,7 @@ def small_records():
             "supplier": "T-Systems Slovakia s.r.o.",
             "price_numeric_eur": 500_000.0,
             "published_date": "2025-12-15",
-            "category": "IT",
+            "scanned_service_type": "IT",
             "award_type": "open_tender",
             "pdf_text_summary": "IT system deployment",
             "ico_buyer": "00001001",
@@ -62,7 +62,7 @@ def small_records():
             "supplier": "STRABAG s.r.o.",
             "price_numeric_eur": 200_000.0,
             "published_date": "2026-01-10",
-            "category": "supplies",
+            "scanned_service_type": "supplies",
             "award_type": "direct_award",
             "pdf_text_summary": "food supply for canteen",
             "ico_buyer": "00001002",
@@ -74,7 +74,7 @@ def small_records():
             "supplier": "SecurCorp a.s.",
             "price_numeric_eur": 750_000.0,
             "published_date": "2026-01-20",
-            "category": "services",
+            "scanned_service_type": "services",
             "award_type": "open_tender",
             "pdf_text_summary": "security services contract",
             "ico_buyer": "00001003",
@@ -86,7 +86,7 @@ def small_records():
             "supplier": "BuildCo s.r.o.",
             "price_numeric_eur": 300_000.0,
             "published_date": "2026-02-05",
-            "category": "construction",
+            "scanned_service_type": "construction",
             "award_type": "direct_award",
             "pdf_text_summary": "building maintenance",
             "ico_buyer": "00001002",
@@ -215,11 +215,11 @@ class TestFilter:
         assert len(result) == 3  # 1M, 500k, 750k
 
     def test_filter_by_category(self, small_store: DataStore):
-        """Filters on category field."""
-        f = FilterState(categories=["construction"])
+        """Filters on scanned_service_type field (canonical category since fixture migration)."""
+        f = FilterState(scanned_service_types=["construction"])
         result = small_store.filter(f)
         assert len(result) == 2
-        assert all(c.category == "construction" for c in result)
+        assert all(getattr(c, "scanned_service_type", None) == "construction" for c in result)
 
     def test_filter_by_vendor(self, small_store: DataStore):
         """Filter by vendor (supplier)."""
@@ -337,10 +337,10 @@ class TestGroupBy:
         assert set(groups.keys()) == {"construction", "IT"}
 
     def test_group_by_sample_data(self, store: DataStore):
-        """Sample data all category='not_decided' → single group."""
+        """Sample data has no scanned_service_type → all fall into 'Nezaradené' group."""
         groups = store.group_by("category")
-        assert "not_decided" in groups
-        assert len(groups["not_decided"]) == 29
+        assert "Nezaraden\u00e9" in groups
+        assert len(groups["Nezaraden\u00e9"]) == 29
 
 
 # ── 5. Aggregation ──────────────────────────────────────────────────
@@ -697,7 +697,7 @@ def sort_store() -> DataStore:
             "supplier": "Vendor C",
             "price_numeric_eur": 500_000.0,
             "published_date": "2025-01-15",
-            "category": "construction",
+            "scanned_service_type": "construction",
             "scanned_suggested_title": "Road maintenance",
             "scanned_service_type": "construction_services",
             "scanned_service_subtype": "bridges",
@@ -708,7 +708,7 @@ def sort_store() -> DataStore:
             "supplier": "vendor a",
             "price_numeric_eur": 500_000.0,  # same price as Alpha
             "published_date": "2025-06-01",   # later date
-            "category": "IT",
+            "scanned_service_type": "IT",
             "scanned_suggested_title": "Airport support",
             "scanned_service_type": "air_transport",
             "scanned_service_subtype": "airfield",
@@ -719,7 +719,7 @@ def sort_store() -> DataStore:
             "supplier": "Vendor D",
             "price_numeric_eur": 200_000.0,
             "published_date": "2025-03-20",
-            "category": "services",
+            "scanned_service_type": "services",
             "scanned_suggested_title": "Waste collection",
             "scanned_service_type": "waste_services",
             "scanned_service_subtype": "bins",
@@ -730,7 +730,7 @@ def sort_store() -> DataStore:
             "supplier": "Vendor B",
             "price_numeric_eur": 800_000.0,
             "published_date": "2025-09-10",
-            "category": "supplies",
+            "scanned_service_type": "supplies",
             "scanned_suggested_title": "Zoo cleaning",
             "scanned_service_type": "cleaning_services",
             "scanned_service_subtype": "zebra",
@@ -741,7 +741,7 @@ def sort_store() -> DataStore:
             "supplier": "Vendor E",
             "price_numeric_eur": None,          # None price
             "published_date": "2025-07-01",
-            "category": "construction",
+            "scanned_service_type": "construction",
             "scanned_suggested_title": None,
             "scanned_service_type": None,
             "scanned_service_subtype": None,
@@ -1034,3 +1034,132 @@ class TestTrendMultiMetric:
         data = small_store.trend_multi_metric(granularity="month")
         for point in data:
             assert "total_spend" in point
+
+
+# ── Flag-count filtering ────────────────────────────────────────────
+
+
+class TestFlagCountFiltering:
+    """Tests for vendor / institution flag-count filters."""
+
+    @pytest.fixture
+    def store_with_flags(self):
+        """DataStore with a few contracts and merged red flags."""
+        ds = DataStore()
+        ds.load_from_list(
+            [
+                {
+                    "contract_id": "C1",
+                    "contract_title": "Alpha",
+                    "buyer": "Inst A",
+                    "supplier": "Vendor X",
+                    "price_numeric_eur": 100,
+                    "published_date": "2025-01-01",
+                },
+                {
+                    "contract_id": "C2",
+                    "contract_title": "Beta",
+                    "buyer": "Inst A",
+                    "supplier": "Vendor Y",
+                    "price_numeric_eur": 200,
+                    "published_date": "2025-02-01",
+                },
+                {
+                    "contract_id": "C3",
+                    "contract_title": "Gamma",
+                    "buyer": "Inst B",
+                    "supplier": "Vendor X",
+                    "price_numeric_eur": 300,
+                    "published_date": "2025-03-01",
+                },
+                {
+                    "contract_id": "C4",
+                    "contract_title": "Delta",
+                    "buyer": "Inst C",
+                    "supplier": "Vendor Z",
+                    "price_numeric_eur": 400,
+                    "published_date": "2025-04-01",
+                },
+            ]
+        )
+        # RF dataset: Vendor X flagged on C1 and C3; Inst A flagged on C1
+        ds.merge_red_flags(
+            {
+                "dataset_name": "test_ds",
+                "flags": [
+                    {
+                        "contract_id": "C1",
+                        "red_flag_type": "type_a",
+                        "red_flag_name": "Type A",
+                        "severity": "moderate",
+                        "description": "desc",
+                    },
+                    {
+                        "contract_id": "C3",
+                        "red_flag_type": "type_b",
+                        "red_flag_name": "Type B",
+                        "severity": "severe",
+                        "description": "desc",
+                    },
+                ],
+            }
+        )
+        return ds
+
+    def test_vendor_flag_count_min(self, store_with_flags: DataStore):
+        """vendor_flag_count_min=1 returns only contracts from flagged vendors."""
+        f = FilterState(vendor_flag_count_min=1)
+        result = store_with_flags.filter(f)
+        suppliers = {c.supplier for c in result}
+        assert "Vendor X" in suppliers
+        assert "Vendor Y" not in suppliers
+        assert "Vendor Z" not in suppliers
+
+    def test_vendor_flag_count_max_zero(self, store_with_flags: DataStore):
+        """vendor_flag_count_max=0 returns only contracts from unflagged vendors."""
+        f = FilterState(vendor_flag_count_max=0)
+        result = store_with_flags.filter(f)
+        suppliers = {c.supplier for c in result}
+        assert "Vendor X" not in suppliers
+        assert "Vendor Y" in suppliers
+        assert "Vendor Z" in suppliers
+
+    def test_institution_flag_count_min(self, store_with_flags: DataStore):
+        """institution_flag_count_min=1 returns only contracts from flagged institutions."""
+        f = FilterState(institution_flag_count_min=1)
+        result = store_with_flags.filter(f)
+        buyers = {c.buyer for c in result}
+        # Inst A has 1 flag (on C1), Inst B has 1 flag (on C3)
+        assert "Inst A" in buyers
+        assert "Inst B" in buyers
+        assert "Inst C" not in buyers
+
+    def test_institution_flag_count_max_zero(self, store_with_flags: DataStore):
+        """institution_flag_count_max=0 returns only contracts from unflagged institutions."""
+        f = FilterState(institution_flag_count_max=0)
+        result = store_with_flags.filter(f)
+        buyers = {c.buyer for c in result}
+        assert "Inst A" not in buyers
+        assert "Inst B" not in buyers
+        assert "Inst C" in buyers
+
+    def test_vendor_flag_count_min_exceeds_all(self, store_with_flags: DataStore):
+        """vendor_flag_count_min higher than any count returns empty."""
+        f = FilterState(vendor_flag_count_min=100)
+        result = store_with_flags.filter(f)
+        assert len(result) == 0
+
+    def test_no_flag_count_filters_returns_all(self, store_with_flags: DataStore):
+        """No flag count filters returns all contracts."""
+        f = FilterState()
+        result = store_with_flags.filter(f)
+        assert len(result) == store_with_flags.count
+
+    def test_combined_vendor_and_institution_min(self, store_with_flags: DataStore):
+        """Combined vendor and institution min filters are ANDed."""
+        f = FilterState(vendor_flag_count_min=1, institution_flag_count_min=1)
+        result = store_with_flags.filter(f)
+        # Only contracts where BOTH vendor and institution have >= 1 flag
+        for c in result:
+            assert c.supplier == "Vendor X"  # only flagged vendor
+            assert c.buyer in ("Inst A", "Inst B")  # both flagged

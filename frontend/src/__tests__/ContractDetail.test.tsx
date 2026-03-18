@@ -10,6 +10,10 @@ import * as api from '../api';
 
 vi.mock('../api');
 
+// Isolate ContractDetail from ChatBar — ChatBar makes a real fetchChatStatus()
+// call on mount which would throw when '../api' is auto-mocked.
+vi.mock('../components/ChatBar', () => ({ default: () => null }));
+
 const mockContract: Contract = {
   contract_id: 'c123',
   contract_title: 'Test Contract Title',
